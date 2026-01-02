@@ -257,6 +257,11 @@ function startNewGame(idx) {
             { x: 0, y: 500, width: 2500, height: 50 } // Long flat floor
         ];
 
+        // Safety Blocks (to escape fire)
+        platforms.push({ x: 400, y: 350, width: 100, height: 20 });
+        platforms.push({ x: 800, y: 350, width: 100, height: 20 });
+        platforms.push({ x: 1200, y: 350, width: 100, height: 20 });
+
         // No random enemies
         enemies = [];
     } else {

@@ -282,7 +282,9 @@ function startNewGame(idx) {
         hp: isSuper ? 100 : 30,
         maxHp: isSuper ? 100 : 30,
         nextShot: 100, // Cooldown for fireball
-        isSuper: isSuper
+        isSuper: isSuper,
+        fireTimer: 600, // 10 seconds for Fire Attack
+        fireActiveTimer: 0
     });
 
     // Add Goal Platform
@@ -769,6 +771,31 @@ function update() {
                         enemy.nextShot = enemy.isSuper ? 120 : 240; // Super Boss shoots 2x faster
                     }
                 }
+
+                // SUPER BOSS AI: Chase & Fire Attack
+                if (enemy.isSuper) {
+                    // 1. Chase Player (Slowly)
+                    if (enemy.x < player.x - 200) enemy.x += 1;
+                    if (enemy.x > player.x + 200) enemy.x -= 1;
+
+                    // 2. Fire Attack Logic
+                    if (enemy.fireActiveTimer > 0) {
+                        // Fire is ACTIVE!
+                        enemy.fireActiveTimer--;
+
+                        // Damage Player if on ground (y > 450 approx)
+                        if (player.y > 450 && player.grounded) {
+                            takeDamage(false); // Burn!!
+                        }
+                    } else {
+                        // Countdown
+                        enemy.fireTimer--;
+                        if (enemy.fireTimer <= 0) {
+                            enemy.fireActiveTimer = 180; // Activate for 3 seconds
+                            enemy.fireTimer = 600; // Reset timer
+                        }
+                    }
+                }
             } else {
                 enemy.x += enemy.speed * enemy.dir;
                 // Simple Patrol Logic
@@ -833,6 +860,13 @@ function takeDamage(isLava) {
 function draw() {
     // Clear screen (Sky remains static!)
     ctx.fillStyle = '#87CEEB';
+
+    // RED SKY effect during Fire Attack
+    let boss = enemies.find(e => e.type === 'boss');
+    if (boss && boss.isSuper && boss.fireActiveTimer > 0) {
+        ctx.fillStyle = '#500000'; // Dark Red Sky
+    }
+
     ctx.fillRect(0, 0, canvas.width, canvas.height); // Draw sky fixed to screen
 
     // TIME STOP EFFECT (Purple tint)
@@ -927,6 +961,38 @@ function draw() {
             }
         }
         return;
+    }
+
+    // SUPER BOSS FIRE COUNTDOWN
+    if (boss && boss.isSuper) {
+        let timeLeft = Math.ceil(boss.fireTimer / 60);
+
+        if (boss.fireActiveTimer > 0) {
+            // FIRE ACTIVE!
+            ctx.fillStyle = 'red';
+            ctx.font = 'bold 40px Arial';
+            ctx.fillText('地面が燃えている！！', 300, 150);
+
+            // Draw LAVA Overlay on floor
+            ctx.fillStyle = 'rgba(255, 69, 0, 0.7)';
+            ctx.fillRect(0, 500, canvas.width, 50); // Visual lava on floor
+        } else {
+            // COUNTDOWN
+            ctx.fillStyle = timeLeft <= 3 ? 'red' : 'white';
+            ctx.font = 'bold 30px Arial';
+            ctx.fillText('炎上まで: ' + timeLeft, 350, 100);
+
+            if (timeLeft <= 3) {
+                ctx.font = 'bold 50px Arial';
+                ctx.fillText('逃げろ！', 350, 150);
+
+                // Warning Flash on floor
+                if (boss.fireTimer % 10 < 5) {
+                    ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+                    ctx.fillRect(0, 500, canvas.width, 50);
+                }
+            }
+        }
     }
 
     // === START CAMERA TRANSFORM ===

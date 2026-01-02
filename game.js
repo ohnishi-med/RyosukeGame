@@ -51,7 +51,10 @@ let player = {
     bridgeBuilt: false,
     canPlaceBlock: false,
     blockCount: 0,
-    isPlacingBlock: false
+    canPlaceBlock: false,
+    blockCount: 0,
+    isPlacingBlock: false,
+    shotCooldown: 0 // New cooldown for shooting
 };
 
 let gravity = 0.5;
@@ -267,17 +270,19 @@ function startNewGame(idx) {
     goal.active = false; // Hidden until boss defeated
 
     // Add Boss Enemy
+    let isSuper = bossMode;
     enemies.push({
         x: levelWidth - 400,
         y: 200, // On platform
-        width: 100, // Big
-        height: 100,
+        width: isSuper ? 150 : 100, // Big or HUGE
+        height: isSuper ? 150 : 100,
         speed: 2,
         dir: -1,
         type: 'boss',
-        hp: 30,
-        maxHp: 30,
-        nextShot: 100 // Cooldown for fireball
+        hp: isSuper ? 100 : 30,
+        maxHp: isSuper ? 100 : 30,
+        nextShot: 100, // Cooldown for fireball
+        isSuper: isSuper
     });
 
     // Add Goal Platform
@@ -309,6 +314,10 @@ document.addEventListener('keydown', function (e) {
 
     // Shooting Logic (Z Key)
     if (e.code === 'KeyZ') {
+        if (player.shotCooldown > 0) return; // Cooldown check
+
+        player.shotCooldown = 20; // Set cooldown (0.3s)
+
         let dir = player.facingRight ? 1 : -1;
         let speed = 10;
 
@@ -627,6 +636,11 @@ function update() {
         player.dy += gravity;
     }
 
+    // Shot Cooldown Logic
+    if (player.shotCooldown > 0) {
+        player.shotCooldown--;
+    }
+
     player.x += player.dx;
     player.y += player.dy;
 
@@ -740,7 +754,7 @@ function update() {
                             (player.y + player.height / 2) - (enemy.y + enemy.height / 2),
                             (player.x + player.width / 2) - (enemy.x + enemy.width / 2)
                         );
-                        let speed = 6; // Reasonable speed
+                        let speed = enemy.isSuper ? 10 : 6; // Fast shot for Super Boss
 
                         enemyProjectiles.push({
                             x: enemy.x + enemy.width / 2 - 10,
@@ -752,7 +766,7 @@ function update() {
                             color: 'red'
                         });
 
-                        enemy.nextShot = 240; // 4 seconds cooldown
+                        enemy.nextShot = enemy.isSuper ? 120 : 240; // Super Boss shoots 2x faster
                     }
                 }
             } else {
@@ -864,7 +878,7 @@ function draw() {
 
         ctx.fillStyle = 'white';
         ctx.font = 'bold 24px Arial';
-        ctx.fillText('いきなり', 640, 50);
+        ctx.fillText('スーパー', 640, 50);
         ctx.fillText('ボス戦', 655, 75);
 
         ctx.strokeStyle = 'white';
@@ -1403,6 +1417,10 @@ canvas.addEventListener('touchstart', function (e) {
         let atkBtn = touchControls.find(b => b.id === 'attack');
         if (touchX > atkBtn.x && touchX < atkBtn.x + atkBtn.width &&
             touchY > atkBtn.y && touchY < atkBtn.y + atkBtn.height) {
+
+            if (player.shotCooldown > 0) continue; // Cooldown Check
+            player.shotCooldown = 20;
+
             // Simulate Attack Logic (KeyZ)
             // Copying logic from keydown (lines 296-323)
             let dir = player.facingRight ? 1 : -1;

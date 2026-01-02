@@ -1211,6 +1211,8 @@ function draw() {
         ctx.fillText('F5キーでやりなおし', canvas.width / 2, 400);
         ctx.textAlign = 'start';
     }
+
+    drawVirtualControls();
 }
 
 function gameLoop() {
@@ -1220,3 +1222,171 @@ function gameLoop() {
 }
 
 gameLoop();
+
+// --- MOBILE TOUCH CONTROLS ---
+
+const touchControls = [
+    { id: 'left', x: 20, y: 500, width: 80, height: 80, key: 'ArrowLeft', label: '←' },
+    { id: 'right', x: 120, y: 500, width: 80, height: 80, key: 'ArrowRight', label: '→' },
+    { id: 'jump', x: 680, y: 500, width: 80, height: 80, key: 'Space', label: 'JUMP' },
+    { id: 'attack', x: 580, y: 500, width: 80, height: 80, key: 'KeyZ', label: 'ATK' }
+];
+
+function drawVirtualControls() {
+    // Only draw if screen width is small (simulating mobile) OR if we just want to force it for testing
+    // For now, let's always draw them if the device supports touch or screen is small
+    // Simple check: always draw for this prototype
+
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+
+    touchControls.forEach(btn => {
+        ctx.fillStyle = '#333';
+        ctx.fillRect(btn.x, btn.y, btn.width, btn.height);
+
+        ctx.fillStyle = 'white';
+        ctx.font = '20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
+
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(btn.x, btn.y, btn.width, btn.height);
+    });
+
+    ctx.restore();
+}
+
+function handleTouch(e) {
+    e.preventDefault(); // Prevent scrolling
+
+    // Reset mapped keys first (optional, but safer to assume no touch = no key press for these specific keys)
+    // Actually, we should track active touches.
+
+    // Clear our virtual keys for this frame (simulated)
+    // But we can't clear ALL keys, only the ones we control.
+    // Better approach: Check all active touches and set keys true if they match a button.
+
+    // 1. Reset virtual keys false
+    touchControls.forEach(btn => {
+        keys[btn.key] = false;
+    });
+
+    // 2. Check active touches
+    for (let i = 0; i < e.touches.length; i++) {
+        const touch = e.touches[i];
+        const rect = canvas.getBoundingClientRect();
+
+        // Scale touch coordinates to canvas size
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        const touchX = (touch.clientX - rect.left) * scaleX;
+        const touchY = (touch.clientY - rect.top) * scaleY;
+
+        touchControls.forEach(btn => {
+            if (touchX > btn.x && touchX < btn.x + btn.width &&
+                touchY > btn.y && touchY < btn.y + btn.height) {
+                keys[btn.key] = true;
+
+                // Special handling for jump (Space causes jump on keydown)
+                // In game loop, we check keys['Space']. 
+                // The original code uses 'keydown' event for jump initiation.
+                // We might need to manually trigger logic or ensure keys['Space'] being true works.
+                // Original: if (e.code === 'Space') ... 
+                // We need to simulate the "keydown" effect if it wasn't pressed before.
+            }
+        });
+    }
+}
+
+// Attach listeners
+canvas.addEventListener('touchstart', handleTouch, { passive: false });
+canvas.addEventListener('touchmove', handleTouch, { passive: false });
+canvas.addEventListener('touchend', handleTouch, { passive: false });
+
+// Also handle jump trigger specifically if needed, but the loop checks keys['Space']
+// Wait, the jump logic is in 'keydown' event listener (lines 328).
+// "if (e.code === 'Space')" -> this only runs once per press.
+// If I just set keys['Space'] = true, the `update` loop might not catch the specific "initiate jump" moment 
+// because that logic is INSIDE the event listener, not the update loop. (Lines 327-346)
+
+// FIX: We need to move the Jump logic into `update()` or trigger it manually.
+// Refactoring Jump Logic:
+// I will extract the jump logic into a function `doJump()` and call it.
+// Or, detecting a "new press" in the update loop.
+
+// Let's modify the update loop to handle jump if keys['Space'] is held? 
+// No, we want distinct jumps.
+
+// To support touch "tap" for jump:
+// specific logic in handleTouch for 'touchstart'.
+canvas.addEventListener('touchstart', function (e) {
+    handleTouch(e); // Update keys
+
+    // Trigger "Jump" logic if Jump button was just touched
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const touchX = (touch.clientX - rect.left) * scaleX;
+        const touchY = (touch.clientY - rect.top) * scaleY;
+
+        // Check Jump Button
+        let jumpBtn = touchControls.find(b => b.id === 'jump');
+        if (touchX > jumpBtn.x && touchX < jumpBtn.x + jumpBtn.width &&
+            touchY > jumpBtn.y && touchY < jumpBtn.y + jumpBtn.height) {
+            // Simulate Jump Event Logic
+            // Copying logic from keydown listener
+            if (player.isFlying) {
+                // Handled in update
+            } else {
+                if (player.jumpCount < player.maxJumps) {
+                    let jumpForce = player.jumpPower;
+                    if (player.isSpeedUp) jumpForce *= 1.5;
+
+                    if (player.jumpCount === 0) {
+                        player.dy = jumpForce;
+                    } else {
+                        player.dy = jumpForce * 0.7;
+                    }
+                    player.grounded = false;
+                    player.jumpCount++;
+                }
+            }
+        }
+
+        // Check Attack Button
+        let atkBtn = touchControls.find(b => b.id === 'attack');
+        if (touchX > atkBtn.x && touchX < atkBtn.x + atkBtn.width &&
+            touchY > atkBtn.y && touchY < atkBtn.y + atkBtn.height) {
+            // Simulate Attack Logic (KeyZ)
+            // Copying logic from keydown (lines 296-323)
+            let dir = player.facingRight ? 1 : -1;
+            let speed = 10;
+            let shots = [];
+            if (player.canTripleShot) {
+                shots.push({ vx: speed * dir, vy: 0 });
+                shots.push({ vx: speed * dir, vy: -2 });
+                shots.push({ vx: speed * dir, vy: 2 });
+            } else {
+                shots.push({ vx: speed * dir, vy: 0 });
+            }
+
+            shots.forEach(shot => {
+                lasers.push({
+                    x: player.x + player.width / 2,
+                    y: player.y + player.height / 2,
+                    width: 30,
+                    height: 5,
+                    vx: shot.vx,
+                    vy: shot.vy,
+                    color: player.canStrongBeam ? 'orange' : 'yellow',
+                    isStrong: player.canStrongBeam
+                });
+            });
+        }
+    }
+}, { passive: false });

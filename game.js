@@ -541,6 +541,50 @@ canvas.addEventListener('click', function (e) {
 
 function update() {
     if (gameState !== 'PLAYING') return;
+    // Check Goal Collision
+    // ... (Existing Goal Logic)
+
+    // CHECK CHEST COLLISION (Victory Dance Trigger)
+    if (specialChest && specialChest.active &&
+        player.x < specialChest.x + specialChest.width &&
+        player.x + player.width > specialChest.x &&
+        player.y < specialChest.y + specialChest.height &&
+        player.y + player.height > specialChest.y) {
+
+        // TRIGGER VICTORY DANCE
+        gameState = 'VICTORY_DANCE';
+        specialChest.active = false;
+
+        // Spawn Clones
+        for (let i = 0; i < 10; i++) {
+            victoryDancePlayers.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * 500,
+                dx: (Math.random() - 0.5) * 10,
+                dy: (Math.random() - 0.5) * 10,
+                color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                rotation: 0
+            });
+        }
+    }
+
+    // UPDATE VICTORY DANCE
+    if (gameState === 'VICTORY_DANCE') {
+        victoryDancePlayers.forEach(p => {
+            p.x += p.dx;
+            p.y += p.dy;
+            p.rotation += 0.1;
+
+            // Bounce off walls
+            if (p.x < 0 || p.x > canvas.width) p.dx *= -1;
+            if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
+
+            // Change color
+            p.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        });
+        return; // Skip normal update
+    }
+
     if (gameWon) return;
 
     // Laser Movement & Collision
@@ -1156,291 +1200,342 @@ function draw() {
         }
     }
 
-    // Draw Enemies
-    enemies.forEach(enemy => {
-        let img = ballImg;
-        if (enemy.type === 'strong') img = ironBallImg;
-        if (enemy.type === 'boss') {
-            // Draw Boss (Giant Red Dragon - Character 0)
-            let bossImg = characters[0]; // Reuse Red Dragon sprite
+});
 
-            if (bossImg && bossImg.complete) {
-                ctx.save();
-                ctx.translate(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
+// DRAW SPECIAL CHEST
+if (specialChest && specialChest.active) {
+    let screenX = specialChest.x - camera.x;
+    ctx.fillStyle = 'gold';
+    ctx.fillRect(screenX, specialChest.y, specialChest.width, specialChest.height);
+    ctx.strokeStyle = 'brown';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(screenX, specialChest.y, specialChest.width, specialChest.height);
+    ctx.fillStyle = 'white';
+    ctx.font = '12px Arial';
+    ctx.fillText('お宝', screenX + 10, specialChest.y + 30);
+}
 
-                // Face Player
-                if (player.x > enemy.x) {
-                    ctx.scale(-1, 1);
-                }
+// Draw Enemies
+enemies.forEach(enemy => {
+    let img = ballImg;
+    if (enemy.type === 'strong') img = ironBallImg;
+    if (enemy.type === 'boss') {
+        // Draw Boss (Giant Red Dragon - Character 0)
+        let bossImg = characters[0]; // Reuse Red Dragon sprite
 
-                // Draw Big
-                ctx.drawImage(bossImg, -enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
-                ctx.restore();
-            } else {
-                // Fallback
-                ctx.fillStyle = 'red';
-                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
-            }
-
-            // Draw Boss HP Bar
-            ctx.fillStyle = 'black';
-            ctx.fillRect(enemy.x, enemy.y - 20, enemy.width, 10);
-            ctx.fillStyle = 'green';
-            let hpPercent = Math.max(0, enemy.hp / enemy.maxHp);
-            ctx.fillRect(enemy.x, enemy.y - 20, enemy.width * hpPercent, 10);
-            return;
-        }
-
-        if (img.complete) {
+        if (bossImg && bossImg.complete) {
             ctx.save();
             ctx.translate(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
 
-            // Spin only if NOT topped
-            if (!player.isTimeStopped) {
-                ctx.rotate(Date.now() / 200);
+            // Face Player
+            if (player.x > enemy.x) {
+                ctx.scale(-1, 1);
             }
 
-            ctx.drawImage(img, -enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+            // Draw Big
+            ctx.drawImage(bossImg, -enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
             ctx.restore();
         } else {
-            ctx.fillStyle = (enemy.type === 'strong') ? 'black' : 'purple';
+            // Fallback
+            ctx.fillStyle = 'red';
             ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
         }
-    });
 
-    // === END CAMERA TRANSFORM ===
-    ctx.restore();
-
-    // UI Distance Meter
-    ctx.fillStyle = 'white';
-    ctx.font = '24px Arial';
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 3;
-    let dist = Math.max(0, Math.floor((goal.x - player.x) / 10)); // Dynamic distance
-    let text = 'ゴールまで: ' + dist + 'm';
-    ctx.strokeText(text, 550, 40);
-    ctx.fillText(text, 550, 40);
-
-    // HP Display (Hearts)
-    ctx.fillStyle = 'red';
-    ctx.font = '30px Arial';
-    let hearts = '❤'.repeat(player.hp);
-    ctx.strokeText(hearts, 20, 50);
-    ctx.fillText(hearts, 20, 50);
-
-    // Heal Button (Red Character Only)
-    if (player.canHeal && !player.healUsed) {
+        // Draw Boss HP Bar
+        ctx.fillStyle = 'black';
+        ctx.fillRect(enemy.x, enemy.y - 20, enemy.width, 10);
         ctx.fillStyle = 'green';
-        ctx.fillRect(650, 80, 100, 40);
-        ctx.fillStyle = 'white';
-        ctx.font = '20px Arial';
-        ctx.fillText('回復', 670, 108);
-
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(650, 80, 100, 40);
+        let hpPercent = Math.max(0, enemy.hp / enemy.maxHp);
+        ctx.fillRect(enemy.x, enemy.y - 20, enemy.width * hpPercent, 10);
+        return;
     }
 
-    // Fly Button (Yellow Character Only)
-    if (player.canFly) {
-        if (player.isFlying) {
-            // Draw Timer
-            ctx.fillStyle = 'orange';
-            ctx.font = '30px Arial';
-            ctx.fillText('飛行中: ' + Math.ceil(player.flyTimer / 60), 650, 160);
-        } else if (!player.flyUsed) {
-            // Draw Button
-            ctx.fillStyle = '#00BFFF'; // Deep Sky Blue
-            ctx.fillRect(650, 130, 100, 40);
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
-            ctx.fillText('飛ぶ', 670, 158);
+    if (img.complete) {
+        ctx.save();
+        ctx.translate(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
 
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(650, 130, 100, 40);
+        // Spin only if NOT topped
+        if (!player.isTimeStopped) {
+            ctx.rotate(Date.now() / 200);
         }
+
+        ctx.drawImage(img, -enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+        ctx.restore();
+    } else {
+        ctx.fillStyle = (enemy.type === 'strong') ? 'black' : 'purple';
+        ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
     }
+});
 
-    // Time Stop Button (Pink Character Only)
-    if (player.canTimeStop) {
-        if (player.isTimeStopped) {
-            ctx.fillStyle = 'purple';
-            ctx.font = '30px Arial';
-            ctx.fillText('時間停止中: ' + Math.ceil(player.timeStopTimer / 60), 650, 210);
-        } else if (!player.timeStopUsed) {
-            ctx.fillStyle = '#DA70D6'; // Orchid
-            ctx.fillRect(650, 180, 100, 40);
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
-            ctx.fillText('止める', 660, 208);
+// === END CAMERA TRANSFORM ===
+ctx.restore();
 
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(650, 180, 100, 40);
-        }
-    }
+// UI Distance Meter
+ctx.fillStyle = 'white';
+ctx.font = '24px Arial';
+ctx.strokeStyle = 'black';
+ctx.lineWidth = 3;
+let dist = Math.max(0, Math.floor((goal.x - player.x) / 10)); // Dynamic distance
+let text = 'ゴールまで: ' + dist + 'm';
+ctx.strokeText(text, 550, 40);
+ctx.fillText(text, 550, 40);
 
-    // Invincible Button (Purple Character Only)
-    if (player.canInvincible) {
-        if (player.isSuperInvincible) {
-            ctx.fillStyle = 'gold'; // Gold Text
-            ctx.font = '30px Arial';
-            ctx.fillText('無敵中: ' + Math.ceil(player.invincible / 60), 650, 260);
-        } else if (!player.invincibleUsed) {
-            ctx.fillStyle = '#9370DB'; // Medium Purple
-            ctx.fillRect(650, 230, 100, 40);
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
-            ctx.fillText('無敵', 670, 258);
+// HP Display (Hearts)
+ctx.fillStyle = 'red';
+ctx.font = '30px Arial';
+let hearts = '❤'.repeat(player.hp);
+ctx.strokeText(hearts, 20, 50);
+ctx.fillText(hearts, 20, 50);
 
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(650, 230, 100, 40);
-        }
-    }
+// Heal Button (Red Character Only)
+if (player.canHeal && !player.healUsed) {
+    ctx.fillStyle = 'green';
+    ctx.fillRect(650, 80, 100, 40);
+    ctx.fillStyle = 'white';
+    ctx.font = '20px Arial';
+    ctx.fillText('回復', 670, 108);
 
-    // Speed Up Button (Light Blue)
-    if (player.canSpeedUp) {
-        if (player.isSpeedUp) {
-            ctx.fillStyle = 'cyan';
-            ctx.font = '24px Arial';
-            ctx.fillText('超加速中: ' + Math.ceil(player.speedUpTimer / 60), 650, 310);
-        } else if (!player.speedUpUsed) {
-            ctx.fillStyle = '#00FFFF'; // Cyan
-            ctx.fillRect(650, 280, 100, 40);
-            ctx.fillStyle = 'black';
-            ctx.font = '20px Arial';
-            ctx.fillText('加速', 670, 308);
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(650, 80, 100, 40);
+}
 
-            ctx.strokeStyle = 'white';
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(650, 280, 100, 40);
-        }
-    }
-
-    // Bridge Button (Black)
-    if (player.canBuildBridge && !player.bridgeBuilt) {
-        ctx.fillStyle = '#333'; // Dark Grey
-        ctx.fillRect(650, 330, 100, 40);
-        ctx.fillStyle = 'white';
-        ctx.font = '20px Arial';
-        ctx.fillText('橋を作る', 660, 358);
-
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(650, 330, 100, 40);
-    }
-
-    // Block Builder UI (Grey - Index 9)
-    if (player.canPlaceBlock) {
+// Fly Button (Yellow Character Only)
+if (player.canFly) {
+    if (player.isFlying) {
+        // Draw Timer
+        ctx.fillStyle = 'orange';
+        ctx.font = '30px Arial';
+        ctx.fillText('飛行中: ' + Math.ceil(player.flyTimer / 60), 650, 160);
+    } else if (!player.flyUsed) {
         // Draw Button
-        ctx.fillStyle = player.isPlacingBlock ? 'yellow' : 'gray'; // Highlight if active
-        ctx.fillRect(650, 380, 100, 40);
+        ctx.fillStyle = '#00BFFF'; // Deep Sky Blue
+        ctx.fillRect(650, 130, 100, 40);
         ctx.fillStyle = 'white';
-        ctx.font = '16px Arial'; // Smaller font to fit
-        ctx.fillText('ブロック: ' + player.blockCount, 655, 405);
+        ctx.font = '20px Arial';
+        ctx.fillText('飛ぶ', 670, 158);
 
         ctx.strokeStyle = 'white';
         ctx.lineWidth = 2;
-        ctx.strokeRect(650, 380, 100, 40);
-
-        // Draw Helper Text if Active
-        if (player.isPlacingBlock) {
-            ctx.fillStyle = 'red';
-            ctx.font = 'bold 24px Arial';
-            ctx.fillText('クリックして設置！', 300, 100);
-        }
+        ctx.strokeRect(650, 130, 100, 40);
     }
+}
 
-    // Win Message and Victory Dance
-    if (gameWon) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height); // Darken background
+// Time Stop Button (Pink Character Only)
+if (player.canTimeStop) {
+    if (player.isTimeStopped) {
+        ctx.fillStyle = 'purple';
+        ctx.font = '30px Arial';
+        ctx.fillText('時間停止中: ' + Math.ceil(player.timeStopTimer / 60), 650, 210);
+    } else if (!player.timeStopUsed) {
+        ctx.fillStyle = '#DA70D6'; // Orchid
+        ctx.fillRect(650, 180, 100, 40);
+        ctx.fillStyle = 'white';
+        ctx.font = '20px Arial';
+        ctx.fillText('止める', 660, 208);
 
-        // Draw Dancing Player
-        if (playerImg.complete) {
-            ctx.save();
-            let centerX = canvas.width / 2;
-            let centerY = canvas.height / 2;
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(650, 180, 100, 40);
+    }
+}
 
-            let jump, rotate;
+// Invincible Button (Purple Character Only)
+if (player.canInvincible) {
+    if (player.isSuperInvincible) {
+        ctx.fillStyle = 'gold'; // Gold Text
+        ctx.font = '30px Arial';
+        ctx.fillText('無敵中: ' + Math.ceil(player.invincible / 60), 650, 260);
+    } else if (!player.invincibleUsed) {
+        ctx.fillStyle = '#9370DB'; // Medium Purple
+        ctx.fillRect(650, 230, 100, 40);
+        ctx.fillStyle = 'white';
+        ctx.font = '20px Arial';
+        ctx.fillText('無敵', 670, 258);
 
-            if (!player.damageTaken) {
-                // SPECIAL DANCE (Perfect!)
-                // High speed, high jump, full rotation!
-                jump = Math.abs(Math.sin(Date.now() / 100)) * -120; // Super High Jump
-                rotate = (Date.now() / 100); // Continuous Spin (Somersault)
-            } else {
-                // NORMAL DANCE
-                jump = Math.abs(Math.sin(Date.now() / 150)) * -60;
-                rotate = Math.sin(Date.now() / 100) * 0.3;
-            }
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(650, 230, 100, 40);
+    }
+}
 
-            ctx.translate(centerX, centerY + jump);
-            ctx.rotate(rotate);
-            ctx.scale(3, 3); // Make it BIG
+// Speed Up Button (Light Blue)
+if (player.canSpeedUp) {
+    if (player.isSpeedUp) {
+        ctx.fillStyle = 'cyan';
+        ctx.font = '24px Arial';
+        ctx.fillText('超加速中: ' + Math.ceil(player.speedUpTimer / 60), 650, 310);
+    } else if (!player.speedUpUsed) {
+        ctx.fillStyle = '#00FFFF'; // Cyan
+        ctx.fillRect(650, 280, 100, 40);
+        ctx.fillStyle = 'black';
+        ctx.font = '20px Arial';
+        ctx.fillText('加速', 670, 308);
 
-            ctx.drawImage(playerImg, -player.width / 2, -player.height / 2, player.width, player.height);
-            ctx.restore();
-        }
+        ctx.strokeStyle = 'white';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(650, 280, 100, 40);
+    }
+}
 
-        ctx.textAlign = 'center';
+// Bridge Button (Black)
+if (player.canBuildBridge && !player.bridgeBuilt) {
+    ctx.fillStyle = '#333'; // Dark Grey
+    ctx.fillRect(650, 330, 100, 40);
+    ctx.fillStyle = 'white';
+    ctx.font = '20px Arial';
+    ctx.fillText('橋を作る', 660, 358);
+
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(650, 330, 100, 40);
+}
+
+// Block Builder UI (Grey - Index 9)
+if (player.canPlaceBlock) {
+    // Draw Button
+    ctx.fillStyle = player.isPlacingBlock ? 'yellow' : 'gray'; // Highlight if active
+    ctx.fillRect(650, 380, 100, 40);
+    ctx.fillStyle = 'white';
+    ctx.font = '16px Arial'; // Smaller font to fit
+    ctx.fillText('ブロック: ' + player.blockCount, 655, 405);
+
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(650, 380, 100, 40);
+
+    // Draw Helper Text if Active
+    if (player.isPlacingBlock) {
+        ctx.fillStyle = 'red';
+        ctx.font = 'bold 24px Arial';
+        ctx.fillText('クリックして設置！', 300, 100);
+    }
+}
+
+// Win Message and Victory Dance
+if (gameWon) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height); // Darken background
+
+    // Draw Dancing Player
+    if (playerImg.complete) {
+        ctx.save();
+        let centerX = canvas.width / 2;
+        let centerY = canvas.height / 2;
+
+        let jump, rotate;
 
         if (!player.damageTaken) {
-            ctx.fillStyle = '#FF00FF'; // Magenta for special
-            ctx.font = '80px Arial';
-            ctx.fillText('パーフェクト！！', canvas.width / 2, 200);
-            ctx.fillStyle = 'gold';
-            ctx.font = '40px Arial';
-            ctx.fillText('すごい！ノーダメージクリア！', canvas.width / 2, 300);
+            // SPECIAL DANCE (Perfect!)
+            // High speed, high jump, full rotation!
+            jump = Math.abs(Math.sin(Date.now() / 100)) * -120; // Super High Jump
+            rotate = (Date.now() / 100); // Continuous Spin (Somersault)
         } else {
-            ctx.fillStyle = 'gold';
-            ctx.font = '60px Arial';
-            ctx.fillText('クリア！おめでとう！', canvas.width / 2, 200);
+            // NORMAL DANCE
+            jump = Math.abs(Math.sin(Date.now() / 150)) * -60;
+            rotate = Math.sin(Date.now() / 100) * 0.3;
         }
 
-        ctx.font = '30px Arial';
-        ctx.fillStyle = 'white';
-        ctx.fillText('F5キーで もういっかい！', canvas.width / 2, 500);
-        ctx.textAlign = 'start'; // Reset alignment
+        ctx.translate(centerX, centerY + jump);
+        ctx.rotate(rotate);
+        ctx.scale(3, 3); // Make it BIG
+
+        ctx.drawImage(playerImg, -player.width / 2, -player.height / 2, player.width, player.height);
+        ctx.restore();
     }
 
-    // Game Over Message
-    if (gameState === 'GAMEOVER') {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.textAlign = 'center';
 
-        ctx.textAlign = 'center';
-        ctx.fillStyle = 'red';
+    if (!player.damageTaken) {
+        ctx.fillStyle = '#FF00FF'; // Magenta for special
+        ctx.font = '80px Arial';
+        ctx.fillText('パーフェクト！！', canvas.width / 2, 200);
+        ctx.fillStyle = 'gold';
+        ctx.font = '40px Arial';
+        ctx.fillText('すごい！ノーダメージクリア！', canvas.width / 2, 300);
+    } else {
+        ctx.fillStyle = 'gold';
         ctx.font = '60px Arial';
-        ctx.fillText('ゲームオーバー...', canvas.width / 2, 300);
-        ctx.font = '30px Arial';
-        ctx.fillStyle = 'white';
-        ctx.fillText('F5キーでやりなおし', canvas.width / 2, 400);
-        ctx.textAlign = 'start';
+        ctx.fillText('クリア！おめでとう！', canvas.width / 2, 200);
     }
 
-    // Draw Ultimate UI
-    if (gameState === 'PLAYING') {
-        let timeLeft = Math.ceil(player.ultimateCooldown / 60);
-        let label = timeLeft > 0 ? timeLeft : 'READY!';
+    ctx.font = '30px Arial';
+    ctx.fillStyle = 'white';
+    ctx.fillText('F5キーで もういっかい！', canvas.width / 2, 500);
+    ctx.textAlign = 'start'; // Reset alignment
+    ctx.textAlign = 'start'; // Reset alignment
+}
 
-        ctx.fillStyle = timeLeft > 0 ? 'gray' : 'gold'; // Gold if ready
-        ctx.fillRect(350, 20, 100, 60);
+// DRAW VICTORY DANCE
+if (gameState === 'VICTORY_DANCE') {
+    // Background
+    ctx.fillStyle = 'black'; // Disco black
+    // Flashing background?
+    if (Math.random() > 0.5) ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        ctx.fillStyle = timeLeft > 0 ? 'white' : 'red';
-        ctx.font = 'bold 20px Arial';
-        ctx.fillText('ULT技', 375, 45);
-        ctx.fillText(label, 375, 70);
+    // Draw Clones
+    victoryDancePlayers.forEach(p => {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        // Draw Player Image but tint it? 
+        // Canvas doesn't support easy tinting of images without offscreen canvas.
+        // Let's just draw the image rotating.
+        ctx.drawImage(playerImg, -30, -30, 60, 60);
 
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(350, 20, 100, 60);
-    }
+        // Add colorful border
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 5;
+        ctx.strokeRect(-30, -30, 60, 60);
+        ctx.restore();
+    });
 
-    drawVirtualControls();
+    ctx.fillStyle = 'gold';
+    ctx.font = '80px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('SUPER VICTORY!!', canvas.width / 2, 200);
+    ctx.font = '40px Arial';
+    ctx.fillText('最高のダンスだ！', canvas.width / 2, 300);
+
+    ctx.textAlign = 'left';
+}
+
+// Game Over Message
+if (gameState === 'GAMEOVER') {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'red';
+    ctx.font = '60px Arial';
+    ctx.fillText('ゲームオーバー...', canvas.width / 2, 300);
+    ctx.font = '30px Arial';
+    ctx.fillStyle = 'white';
+    ctx.fillText('F5キーでやりなおし', canvas.width / 2, 400);
+    ctx.textAlign = 'start';
+}
+
+// Draw Ultimate UI
+if (gameState === 'PLAYING') {
+    let timeLeft = Math.ceil(player.ultimateCooldown / 60);
+    let label = timeLeft > 0 ? timeLeft : 'READY!';
+
+    ctx.fillStyle = timeLeft > 0 ? 'gray' : 'gold'; // Gold if ready
+    ctx.fillRect(350, 20, 100, 60);
+
+    ctx.fillStyle = timeLeft > 0 ? 'white' : 'red';
+    ctx.font = 'bold 20px Arial';
+    ctx.fillText('ULT技', 375, 45);
+    ctx.fillText(label, 375, 70);
+
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(350, 20, 100, 60);
+}
+
+drawVirtualControls();
 }
 
 function gameLoop() {

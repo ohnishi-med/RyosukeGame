@@ -800,6 +800,9 @@ function update() {
         }
         // END: Remove enemies near Boss
 
+        // HIDDEN ENEMY INVINCIBILITY LOGIC
+        if (enemy.invincible > 0) enemy.invincible--;
+
         // ONLY MOVE IF TIME IS NOT STOPPED
         if (!player.isTimeStopped) {
             if (enemy.type === 'boss') {

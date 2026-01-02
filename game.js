@@ -47,10 +47,6 @@ let player = {
     speedUpUsed: false,
     isSpeedUp: false,
     speedUpTimer: 0,
-    canBuildBridge: false,
-    bridgeBuilt: false,
-    canPlaceBlock: false,
-    blockCount: 0,
     canPlaceBlock: false,
     blockCount: 0,
     isPlacingBlock: false,
@@ -60,6 +56,13 @@ let player = {
     ultimateCooldown: 0, // 3600 = 60 seconds
     ultimateActive: 0    // Duration of effect
 };
+
+let gravity = 0.5;
+let score = 0;
+let levelWidth = 2000;
+let gameWon = false;
+let specialChest = null; // {x, y, width, height, active}
+let victoryDancePlayers = []; // Array of clone objects
 
 let gravity = 0.5;
 let friction = 0.8;
@@ -1200,7 +1203,8 @@ function draw() {
         }
     }
 
-});
+}
+    }
 
 // DRAW SPECIAL CHEST
 if (specialChest && specialChest.active) {

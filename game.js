@@ -174,7 +174,6 @@ const generateEnemies = (levelLen) => {
 let enemies = [];
 
 let goal = { x: 5800, y: 180, width: 60, height: 60 }; // Moved goal to near the end (6000)
-let gameWon = false;
 
 let lasers = [];
 let enemyProjectiles = []; // Fireballs

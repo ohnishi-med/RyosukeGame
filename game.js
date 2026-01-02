@@ -683,6 +683,27 @@ function update() {
     player.x += player.dx;
     player.y += player.dy;
 
+    // PROJECTILE COLLISION (Laser vs Fireball)
+    for (let i = lasers.length - 1; i >= 0; i--) {
+        for (let j = enemyProjectiles.length - 1; j >= 0; j--) {
+            let l = lasers[i];
+            let ep = enemyProjectiles[j];
+
+            if (l.x < ep.x + ep.width &&
+                l.x + l.width > ep.x &&
+                l.y < ep.y + ep.height &&
+                l.y + l.height > ep.y) {
+
+                // Collision! Remove both
+                lasers.splice(i, 1);
+                enemyProjectiles.splice(j, 1);
+
+                // Break to avoid accessing spliced index or double removal
+                break;
+            }
+        }
+    }
+
     // Invincibility Timer
     if (player.invincible > 0) {
         player.invincible--;
@@ -1470,13 +1491,10 @@ function activateUltimate() {
         player.isSpeedUp = true;
         player.speedUpTimer = 1200; // 20s
     }
-    else if (charIdx === 8) { // Black: Sky Castle
-        platforms.push({
-            x: player.x - 200, y: player.y - 150,
-            width: 600, height: 20, color: 'black'
-        });
-        player.y -= 160;
-        player.dy = 0;
+    else if (charIdx === 8) { // Black: Strongest Guard
+        player.isSuperInvincible = true;
+        player.invincible = 600; // 10s
+        player.ultimateActive = 600;
     }
     else if (charIdx === 9) { // Grey: Refill
         player.blockCount += 20;

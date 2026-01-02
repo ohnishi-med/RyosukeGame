@@ -1648,3 +1648,74 @@ canvas.addEventListener('touchstart', function (e) {
         }
     }
 }, { passive: false });
+
+// --- MOUSE CONTROLS FOR VIRTUAL BUTTONS (PC Support) ---
+canvas.addEventListener('mousedown', function (e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
+
+    touchControls.forEach(btn => {
+        if (mouseX > btn.x && mouseX < btn.x + btn.width &&
+            mouseY > btn.y && mouseY < btn.y + btn.height) {
+            keys[btn.key] = true;
+
+            // Handle Jump Logic explicitly for mouse click too
+            if (btn.id === 'jump') {
+                if (!player.isFlying && player.jumpCount < player.maxJumps) {
+                    let jumpForce = player.jumpPower;
+                    if (player.isSpeedUp) jumpForce *= 1.5;
+
+                    if (player.jumpCount === 0) player.dy = jumpForce;
+                    else player.dy = jumpForce * 0.7;
+
+                    player.grounded = false;
+                    player.jumpCount++;
+                }
+            }
+            // Handle Attack Logic
+            if (btn.id === 'attack') {
+                if (player.shotCooldown <= 0) {
+                    player.shotCooldown = 20;
+                    // Simulate Attack
+                    let dir = player.facingRight ? 1 : -1;
+                    let speed = 10;
+                    let shots = [];
+                    if (player.canTripleShot) {
+                        shots.push({ vx: speed * dir, vy: 0 });
+                        shots.push({ vx: speed * dir, vy: -2 });
+                        shots.push({ vx: speed * dir, vy: 2 });
+                    } else {
+                        shots.push({ vx: speed * dir, vy: 0 });
+                    }
+                    shots.forEach(shot => {
+                        lasers.push({
+                            x: player.x + player.width / 2, y: player.y + player.height / 2, width: 30, height: 5,
+                            vx: shot.vx, vy: shot.vy, color: player.canStrongBeam ? 'orange' : 'yellow', isStrong: player.canStrongBeam
+                        });
+                    });
+                }
+            }
+            // Handle Ultimate Logic
+            if (btn.id === 'ult') {
+                if (player.ultimateCooldown <= 0) activateUltimate();
+            }
+        }
+    });
+});
+
+canvas.addEventListener('mouseup', function (e) {
+    // Release all virtual keys
+    touchControls.forEach(btn => {
+        keys[btn.key] = false;
+    });
+});
+
+canvas.addEventListener('mouseout', function (e) {
+    // Release all virtual keys if mouse leaves canvas
+    touchControls.forEach(btn => {
+        keys[btn.key] = false;
+    });
+});

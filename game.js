@@ -58,22 +58,19 @@ let player = {
 };
 
 let gravity = 0.5;
-let score = 0;
-let levelWidth = 2000;
-let gameWon = false;
-let specialChest = null; // {x, y, width, height, active}
-let victoryDancePlayers = []; // Array of clone objects
-
-let gravity = 0.5;
 let friction = 0.8;
+let score = 0;
 
 let keys = {};
 
 // Game State
-let gameState = 'SELECTION'; // 'SELECTION', 'PLAYING', 'GAMEOVER', 'WIN'
+let gameState = 'SELECTION'; // 'SELECTION', 'PLAYING', 'GAMEOVER', 'WIN', 'VICTORY_DANCE'
 let selectedLevelLength = 10000; // Default 1km (10000px)
 let bossMode = false; // Toggle for Sudden Boss Battle
 let levelWidth = 10000;
+let gameWon = false;
+let specialChest = null; // {x, y, width, height, active}
+let victoryDancePlayers = []; // Array of clone objects
 let camera = { x: 0, y: 0 };
 
 // Load Images

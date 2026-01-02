@@ -789,7 +789,7 @@ function update() {
                         enemy.fireActiveTimer--;
 
                         // Damage Player if on ground (y > 450 approx)
-                        if (player.y > 450 && player.grounded) {
+                        if (player.y >= 449 && player.grounded) {
                             takeDamage(false); // Burn!!
                         }
                     } else {

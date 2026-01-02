@@ -868,7 +868,35 @@ function update() {
             player.y < enemy.y + enemy.height - 15 &&
             player.y + player.height > enemy.y + 15) {
 
-            takeDamage(false); // false = enemy touch
+            if (player.isSuperInvincible) {
+                // DEAL DAMAGE TO ENEMY
+                if (enemy.invincible && enemy.invincible > 0) {
+                    // Enemy is i-framed (e.g. just hit)
+                } else {
+                    enemy.hp -= 5; // Big damage per frame of contact? Too fast.
+                    // Let's do instant kill for minions, big damage for boss with cooldown
+
+                    if (enemy.type === 'boss') {
+                        if (!enemy.invincible || enemy.invincible <= 0) {
+                            enemy.hp -= 2; // Damage
+                            enemy.invincible = 30; // 0.5s i-frame for boss
+                            // Add hit effect?
+                        }
+                    } else {
+                        // Minions die instantly
+                        enemy.hp = 0;
+                    }
+
+                    // Cleanup dead enemies handled at start of loop or next frame
+                    // But we should probably check here
+                    if (enemy.hp <= 0 && enemy.type !== 'boss') {
+                        enemies.splice(i, 1);
+                        continue; // Skip to next enemy
+                    }
+                }
+            } else {
+                takeDamage(false); // false = enemy touch
+            }
         }
     }
 

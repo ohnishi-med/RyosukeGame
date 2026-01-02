@@ -1719,3 +1719,5 @@ canvas.addEventListener('mouseout', function (e) {
         keys[btn.key] = false;
     });
 });
+
+gameLoop();

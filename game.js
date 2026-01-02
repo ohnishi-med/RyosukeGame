@@ -62,6 +62,7 @@ let keys = {};
 // Game State
 let gameState = 'SELECTION'; // 'SELECTION', 'PLAYING', 'GAMEOVER', 'WIN'
 let selectedLevelLength = 10000; // Default 1km (10000px)
+let bossMode = false; // Toggle for Sudden Boss Battle
 let levelWidth = 10000;
 let camera = { x: 0, y: 0 };
 
@@ -243,8 +244,22 @@ function startNewGame(idx) {
     // Reset Objects
     lasers = [];
     enemyProjectiles = [];
-    platforms = generatePlatforms(selectedLevelLength);
-    enemies = generateEnemies(selectedLevelLength);
+
+    // BOSS MODE LOGIC
+    if (bossMode) {
+        selectedLevelLength = 2000; // Short Arena
+
+        // Simple Arena Floor
+        platforms = [
+            { x: 0, y: 500, width: 2500, height: 50 } // Long flat floor
+        ];
+
+        // No random enemies
+        enemies = [];
+    } else {
+        platforms = generatePlatforms(selectedLevelLength);
+        enemies = generateEnemies(selectedLevelLength);
+    }
 
     // Set Level
     levelWidth = selectedLevelLength;
@@ -372,6 +387,13 @@ canvas.addEventListener('click', function (e) {
                 selectedLevelLength = lengths[j];
                 return; // Updated length, don't select char yet
             }
+        }
+
+        // BOSS MODE TOGGLE BUTTON
+        if (mouseX > 600 && mouseX < 780 &&
+            mouseY > 20 && mouseY < 80) {
+            bossMode = !bossMode;
+            return;
         }
 
         for (let i = 0; i < 10; i++) {
@@ -834,6 +856,25 @@ function draw() {
 
             ctx.strokeStyle = 'white';
             ctx.strokeRect(lx, ly, 100, 40);
+        }
+
+        // BOSS MODE BUTTON DRAW
+        ctx.fillStyle = bossMode ? 'red' : 'gray';
+        ctx.fillRect(600, 20, 180, 60);
+
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 24px Arial';
+        ctx.fillText('いきなり', 640, 50);
+        ctx.fillText('ボス戦', 655, 75);
+
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(600, 20, 180, 60);
+
+        if (bossMode) {
+            ctx.fillStyle = 'yellow';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('BOSS MODE ON!', 630, 100);
         }
 
         const abilityNames = [

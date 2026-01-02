@@ -54,7 +54,11 @@ let player = {
     canPlaceBlock: false,
     blockCount: 0,
     isPlacingBlock: false,
-    shotCooldown: 0 // New cooldown for shooting
+    shotCooldown: 0, // New cooldown for shooting
+
+    // Ultimate Skill
+    ultimateCooldown: 0, // 3600 = 60 seconds
+    ultimateActive: 0    // Duration of effect
 };
 
 let gravity = 0.5;
@@ -646,6 +650,34 @@ function update() {
     // Shot Cooldown Logic
     if (player.shotCooldown > 0) {
         player.shotCooldown--;
+    }
+
+    // ULTIMATE SKILL LOGIC
+    if (player.ultimateCooldown > 0) player.ultimateCooldown--;
+    if (player.ultimateActive > 0) player.ultimateActive--;
+
+    // Input for Ultimate (X Key)
+    if (keys['KeyX'] && player.ultimateCooldown <= 0) {
+        activateUltimate();
+    }
+
+    // Continuous Effects for Ultimates
+    if (player.ultimateActive > 0) {
+        // 3. Meteor Smash (Green) - handled in draw/physics
+        // 4. Zero G (Yellow)
+        if (playerImg === characters[3]) {
+            player.dy = 0;
+            if (keys['ArrowUp']) player.y -= 10;
+            if (keys['ArrowDown']) player.y += 10;
+            if (keys['ArrowLeft']) player.x -= 10;
+            if (keys['ArrowRight']) player.x += 10;
+        }
+        // 5. Time Stop (Pink) - Handled in enemy loop
+        // 6. Hyper Mod (Purple) - Handled in collision
+        // 8. Light Speed (Light Blue)
+        if (playerImg === characters[7]) {
+            // Speed handled in movement
+        }
     }
 
     player.x += player.dx;
@@ -1338,6 +1370,24 @@ function draw() {
         ctx.textAlign = 'start';
     }
 
+    // Draw Ultimate UI
+    if (gameState === 'PLAYING') {
+        let timeLeft = Math.ceil(player.ultimateCooldown / 60);
+        let label = timeLeft > 0 ? timeLeft : 'READY!';
+
+        ctx.fillStyle = timeLeft > 0 ? 'gray' : 'gold'; // Gold if ready
+        ctx.fillRect(350, 20, 100, 60);
+
+        ctx.fillStyle = timeLeft > 0 ? 'white' : 'red';
+        ctx.font = 'bold 20px Arial';
+        ctx.fillText('ULT技', 375, 45);
+        ctx.fillText(label, 375, 70);
+
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(350, 20, 100, 60);
+    }
+
     drawVirtualControls();
 }
 
@@ -1347,16 +1397,94 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-gameLoop();
-
 // --- MOBILE TOUCH CONTROLS ---
 
 const touchControls = [
     { id: 'left', x: 20, y: 500, width: 80, height: 80, key: 'ArrowLeft', label: '←' },
     { id: 'right', x: 120, y: 500, width: 80, height: 80, key: 'ArrowRight', label: '→' },
     { id: 'jump', x: 680, y: 500, width: 80, height: 80, key: 'Space', label: 'JUMP' },
-    { id: 'attack', x: 580, y: 500, width: 80, height: 80, key: 'KeyZ', label: 'ATK' }
+    { id: 'attack', x: 580, y: 500, width: 80, height: 80, key: 'KeyZ', label: 'ATK' },
+    { id: 'ult', x: 350, y: 20, width: 100, height: 60, key: 'KeyX', label: 'ULT技' }
 ];
+
+function activateUltimate() {
+    player.ultimateCooldown = 3600; // 60 seconds
+
+    // Determine Character Index based on image source name or checking array
+    let charIdx = characters.indexOf(playerImg);
+    if (charIdx === -1) charIdx = 0; // Default
+
+    // EFFECT LOGIC per Character
+    if (charIdx === 0) { // Red: Full Heal
+        player.hp = player.maxHp;
+    }
+    else if (charIdx === 1) { // White: Omni Shot
+        // Shoot 8 directions
+        let dirs = [
+            [1, 0], [-1, 0], [0, 1], [0, -1],
+            [1, 1], [1, -1], [-1, 1], [-1, -1]
+        ];
+        dirs.forEach(d => {
+            lasers.push({
+                x: player.x + player.width / 2, y: player.y + player.height / 2,
+                width: 40, height: 40, vx: d[0] * 15, vy: d[1] * 15,
+                color: 'white', isStrong: true
+            });
+        });
+    }
+    else if (charIdx === 2) { // Green: Meteor
+        player.dy = -30; // Launch up
+        setTimeout(() => { player.dy = 50; }, 500); // Slam down
+    }
+    else if (charIdx === 3) { // Yellow: Zero G
+        player.ultimateActive = 1200; // 20s
+    }
+    else if (charIdx === 4) { // Pink: The World
+        player.isTimeStopped = true;
+        player.timeStopTimer = 600; // 10s (Using existing variable)
+        player.ultimateCooldown = 3600;
+    }
+    else if (charIdx === 5) { // Purple: Hyper Invincible
+        player.isSuperInvincible = true;
+        player.invincible = 900; // 15s
+        player.ultimateActive = 900;
+    }
+    else if (charIdx === 6) { // Orange: Giga Beam
+        lasers.push({
+            x: player.x, y: player.y + 10,
+            width: canvas.width, height: 30,
+            vx: 0, vy: 0, // Stationary (or move with player)
+            color: 'orange', isStrong: true,
+            life: 60 // Special property for beam duration? 
+            // Simplified: Just a super fast long projectile
+        });
+        // Actually, let's make it a huge projectile
+        lasers.push({
+            x: player.x + 50, y: player.y,
+            width: 800, height: 60,
+            vx: 30, vy: 0,
+            color: 'orange', isStrong: true
+        });
+    }
+    else if (charIdx === 7) { // Light Blue: Light Speed
+        player.isSpeedUp = true;
+        player.speedUpTimer = 1200; // 20s
+    }
+    else if (charIdx === 8) { // Black: Sky Castle
+        platforms.push({
+            x: player.x - 200, y: player.y - 150,
+            width: 600, height: 20, color: 'black'
+        });
+        player.y -= 160;
+        player.dy = 0;
+    }
+    else if (charIdx === 9) { // Grey: Refill
+        player.blockCount += 20;
+        if (player.hp < player.maxHp) player.hp++;
+    }
+}
+
+
 
 function drawVirtualControls() {
     // Only draw if screen width is small (simulating mobile) OR if we just want to force it for testing

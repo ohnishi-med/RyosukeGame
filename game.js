@@ -49,8 +49,10 @@ let player = {
     isSpeedUp: false,
     canSpeedUp: false,
     speedUpUsed: false,
+    speedUpUsed: false,
     isSpeedUp: false,
     speedUpTimer: 0,
+    isAttackBoost: false, // New Ability
     canPlaceBlock: false,
     blockCount: 0,
     isPlacingBlock: false,
@@ -677,11 +679,18 @@ function update() {
                     if (laser.isStrong) {
                         enemies.splice(j, 1); // Kill strong enemy!
                         if (!laser.isPiercing) lasers.splice(i, 1);
+                    } else if (player.isAttackBoost) {
+                        // Boost damage for normal laser vs strong
+                        enemy.hp -= 2.5;
+                        if (enemy.hp <= 0) enemies.splice(j, 1);
+                        lasers.splice(i, 1);
                     } else {
                         lasers.splice(i, 1); // Normal laser dies
                     }
                 } else if (enemy.type === 'boss') {
                     let damage = laser.isStrong ? 3 : 1;
+                    if (player.isAttackBoost) damage *= 2.5; // 2.5x Damage!
+
                     enemy.hp -= damage;
                     if (!laser.isPiercing) lasers.splice(i, 1); // Laser disappears
                     /* Logic Moved to Main Loop */
@@ -787,6 +796,14 @@ function update() {
         player.invincible--;
         if (player.invincible <= 0) {
             player.isSuperInvincible = false;
+        }
+    }
+
+    // Ultimate Ability Timer (Generic)
+    if (player.ultimateActive > 0) {
+        player.ultimateActive--;
+        if (player.ultimateActive <= 0) {
+            player.isAttackBoost = false; // Reset Attack Boost
         }
     }
 
@@ -1193,10 +1210,10 @@ function draw() {
             "3だんジャンプ",  // 3: Green
             "そらをとぶ",     // 4: Yellow
             "じかんていし",   // 5: Pink
-            "むてき",         // 6: Purple
+            "こうげき2.5ばい", // 6: Purple
             "さいきょうビーム", // 7: Orange
             "スピード＆ジャンプ", // 8: Light Blue
-            "100mのはし",     // 9: Black
+            "こうげき2.5ばい", // 9: Black
             "ブロックx7",     // 10: Grey
             ""
         ];
@@ -1496,6 +1513,13 @@ function draw() {
         }
     }
 
+    // Attack Boost Indicator (Purple/Black)
+    if (player.isAttackBoost) {
+        ctx.fillStyle = 'red';
+        ctx.font = 'bold 30px Arial';
+        ctx.fillText('攻撃力2.5倍！', 350, 100);
+    }
+
     // Invincible Button (Purple Character Only)
     if (player.canInvincible) {
         if (player.isSuperInvincible) {
@@ -1762,10 +1786,9 @@ function activateUltimate() {
         player.timeStopTimer = 600; // 10s (Using existing variable)
         player.ultimateCooldown = 3600;
     }
-    else if (charIdx === 5) { // Purple: Hyper Invincible
-        player.isSuperInvincible = true;
-        player.invincible = 900; // 15s
-        player.ultimateActive = 900;
+    else if (charIdx === 5) { // Purple: Attack Boost
+        player.isAttackBoost = true;
+        player.ultimateActive = 1200; // 20s
     }
     else if (charIdx === 6) { // Orange: Giga Beam
         // Huge Piercing Beam
@@ -1782,10 +1805,9 @@ function activateUltimate() {
         player.isSpeedUp = true;
         player.speedUpTimer = 1200; // 20s
     }
-    else if (charIdx === 8) { // Black: Strongest Guard
-        player.isSuperInvincible = true;
-        player.invincible = 600; // 10s
-        player.ultimateActive = 600;
+    else if (charIdx === 8) { // Black: Attack Boost
+        player.isAttackBoost = true;
+        player.ultimateActive = 1200; // 20s
     }
     else if (charIdx === 9) { // Grey: Refill
         player.blockCount += 20;

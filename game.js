@@ -300,7 +300,7 @@ function startNewGame(idx) {
     levelWidth = selectedLevelLength;
     goal.x = levelWidth - 200;
     goal.active = false; // Hidden until boss defeated
-    goal.missileTimer = 2400; // 40 seconds initial logic
+    goal.missileTimer = 600; // 10 seconds initial logic
 
     // Add Boss Enemy
     let isSuper = bossMode;
@@ -676,7 +676,7 @@ function update() {
 
         // Fire at 0
         if (goal.missileTimer <= 0) {
-            goal.missileTimer = 2400; // Reset to 40s
+            goal.missileTimer = 600; // Reset to 10s
 
             // Calculate Angle to Player
             let gx = goal.x + goal.width / 2;
@@ -1545,6 +1545,41 @@ function draw() {
             ctx.shadowColor = 'white';
             ctx.fillRect(0, -p.height / 2, p.width, p.height);
             ctx.restore();
+        } else if (p.isMissile) {
+            // Fancy Missile Paint
+            ctx.save();
+            ctx.translate(p.x + p.width / 2, p.y + p.height / 2);
+            let angle = Math.atan2(p.vy, p.vx);
+            ctx.rotate(angle);
+
+            // Engine Flame
+            if (Math.random() > 0.3) {
+                ctx.fillStyle = 'orange';
+                ctx.beginPath();
+                ctx.moveTo(-15, 0);
+                ctx.lineTo(-35 - Math.random() * 10, -8);
+                ctx.lineTo(-35 - Math.random() * 10, 8);
+                ctx.fill();
+            }
+
+            // Body (Silver)
+            ctx.fillStyle = '#C0C0C0';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 20, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cockpit/Tail
+            ctx.fillStyle = '#444';
+            ctx.fillRect(-15, -8, 10, 16); // Fin base
+
+            // Red Tip
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(15, 0, 8, -Math.PI / 2, Math.PI / 2);
+            ctx.fill();
+
+            ctx.restore();
+
         } else {
             ctx.fillStyle = p.color ? p.color : 'orange'; // Respects 'purple' for poison
             ctx.beginPath();

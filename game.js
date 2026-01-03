@@ -493,14 +493,14 @@ canvas.addEventListener('click', function (e) {
             }
         }
 
-        // Invincible Button Click (Purple)
-        if (player.canInvincible && !player.invincibleUsed && !player.isSuperInvincible) {
+        // Attack Boost Button Click (Purple)
+        if (player.canInvincible && !player.invincibleUsed && !player.isAttackBoost) {
             if (mouseX > 650 && mouseX < 750 &&
                 mouseY > 230 && mouseY < 270) {
 
-                player.isSuperInvincible = true;
+                player.isAttackBoost = true;
                 player.invincibleUsed = true;
-                player.invincible = 480; // 8 seconds (60 * 8)
+                player.ultimateActive = 1200; // 20s (Reusing timer logic)
             }
         }
 
@@ -1520,18 +1520,16 @@ function draw() {
         ctx.fillText('攻撃力2.5倍！', 350, 100);
     }
 
-    // Invincible Button (Purple Character Only)
+    // Attack Boost Button (Purple Character Only - Was Invincible)
     if (player.canInvincible) {
-        if (player.isSuperInvincible) {
-            ctx.fillStyle = 'gold'; // Gold Text
-            ctx.font = '30px Arial';
-            ctx.fillText('無敵中: ' + Math.ceil(player.invincible / 60), 650, 260);
+        if (player.isAttackBoost) {
+            // Already active, draw status handled by generic indicator
         } else if (!player.invincibleUsed) {
-            ctx.fillStyle = '#9370DB'; // Medium Purple
+            ctx.fillStyle = 'purple';
             ctx.fillRect(650, 230, 100, 40);
             ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
-            ctx.fillText('無敵', 670, 258);
+            ctx.font = '16px Arial';
+            ctx.fillText('攻撃2.5倍', 660, 258);
 
             ctx.strokeStyle = 'white';
             ctx.lineWidth = 2;

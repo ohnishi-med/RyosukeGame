@@ -306,15 +306,16 @@ function startNewGame(idx) {
         speed: isSuper ? 3 : 2, // Faster if Super
         dir: -1,
         type: 'boss',
-        hp: isSuper ? 300 : 30, // 300 HP for Hydra
-        maxHp: isSuper ? 300 : 30,
+        hp: isSuper ? 150 : 30, // 300 HP for Hydra
+        maxHp: isSuper ? 150 : 30,
         nextShot: 100,
         isSuper: isSuper,
         isAwakened: startAwakened, // Start as Hydra immediately
         awakeningWave: startAwakened ? 0 : undefined, // Start effect
         color: startAwakened ? 'purple' : 'red',
-        fireTimer: 600,
-        fireActiveTimer: 0
+        laserTimer: 600, // 10 seconds
+        laserWarningTimer: 0,
+        potentialLasers: []
     });
 
     if (bossMode) {
@@ -949,27 +950,56 @@ function update() {
                     }
                 }
 
-                // SUPER BOSS AI: Chase & Fire Attack
+                // SUPER BOSS AI: Chase & Laser Attack
                 if (enemy.isSuper) {
                     // 1. Chase Player (Slowly)
                     if (enemy.x < player.x - 200) enemy.x += 1;
                     if (enemy.x > player.x + 200) enemy.x -= 1;
 
-                    // 2. Fire Attack Logic
-                    if (enemy.fireActiveTimer > 0) {
-                        // Fire is ACTIVE!
-                        enemy.fireActiveTimer--;
+                                       // 2. Laser Attack Logic (Every 10 seconds)
+                    if (enemy.laserTimer > 0) {
+                        enemy.laserTimer--;
+                    } else if (enemy.laserWarningTimer === 0 && (!enemy.potentialLasers || enemy.potentialLasers.length === 0)) {
+                        // START WARNING PHASE
+                        enemy.potentialLasers = [];
+                        for (let i = 0; i < 8; i++) {
+                            let side = Math.floor(Math.random() * 3);
+                            let startX, startY;
+                            if (side === 0) { startX = camera.x + Math.random() * canvas.width; startY = -50; }
+                            else if (side === 1) { startX = camera.x - 50; startY = Math.random() * 500; }
+                            else { startX = camera.x + canvas.width + 50; startY = Math.random() * 500; }
 
-                        // Damage Player if on ground (y > 450 approx)
-                        if (player.y >= 449 && player.grounded) {
-                            takeDamage(false, 1); // Burn!!
+                            let angle = Math.atan2(
+                                (player.y + player.height / 2) - startY,
+                                (player.x + player.width / 2) - startX
+                            );
+                            
+                            enemy.potentialLasers.push({ x: startX, y: startY, angle: angle });
                         }
-                    } else {
-                        // Countdown
-                        enemy.fireTimer--;
-                        if (enemy.fireTimer <= 0) {
-                            enemy.fireActiveTimer = 180; // Activate for 3 seconds
-                            enemy.fireTimer = 600; // Reset timer
+                        enemy.laserWarningTimer = 90; // 1.5 second warning // 1 second warning
+                    }
+
+                    // Handle Warning Countdown and Firing
+                    if (enemy.laserWarningTimer > 0) {
+                        enemy.laserWarningTimer--;
+                        if (enemy.laserWarningTimer === 0) {
+                            // FIRE!
+                            enemy.potentialLasers.forEach(p => {
+                                let speed = 10; // Slightly faster for surprise
+                                enemyProjectiles.push({
+                                    x: p.x,
+                                    y: p.y,
+                                    width: 40,
+                                    height: 8,
+                                    vx: Math.cos(p.angle) * speed,
+                                    vy: Math.sin(p.angle) * speed,
+                                    color: 'magenta',
+                                    isLaser: true,
+                                    angle: p.angle
+                                });
+                            });
+                            enemy.potentialLasers = [];
+                            enemy.laserTimer = 600; // Reset timer after firing
                         }
                     }
                 }
@@ -1045,8 +1075,8 @@ function update() {
                 if (!enemy.isAwakened) {
                     // --- AWAKENING EVENT ---
                     enemy.isAwakened = true;
-                    enemy.hp = 300;
-                    enemy.maxHp = 300;
+                    enemy.hp = 150;
+                    enemy.maxHp = 150;
                     enemy.color = 'purple';
                     enemy.awakeningWave = 0;
                     enemy.speed = 3;
@@ -1127,13 +1157,10 @@ function draw() {
     // Clear screen (Sky remains static!)
     ctx.fillStyle = '#87CEEB';
 
-    // RED SKY effect during Fire Attack
-    let boss = enemies.find(e => e.type === 'boss');
-    if (boss && boss.isSuper && boss.fireActiveTimer > 0) {
-        ctx.fillStyle = '#500000'; // Dark Red Sky
-    }
-
+    // SKY COLOR (Static for now)
     ctx.fillRect(0, 0, canvas.width, canvas.height); // Draw sky fixed to screen
+
+    let boss = enemies.find(e => e.type === 'boss');
 
     // TIME STOP EFFECT (Purple tint)
     if (player.isTimeStopped) {
@@ -1242,34 +1269,21 @@ function draw() {
         return;
     }
 
-    // SUPER BOSS FIRE COUNTDOWN
+    // SUPER BOSS LASER COUNTDOWN
     if (boss && boss.isSuper) {
-        let timeLeft = Math.ceil(boss.fireTimer / 60);
+        let timeLeft = Math.ceil(boss.laserTimer / 60);
+        ctx.fillStyle = timeLeft <= 3 ? 'red' : 'white';
+        ctx.font = 'bold 30px Arial';
 
-        if (boss.fireActiveTimer > 0) {
-            // FIRE ACTIVE!
+        if (boss.laserWarningTimer > 0) {
             ctx.fillStyle = 'red';
-            ctx.font = 'bold 40px Arial';
-            ctx.fillText('地面が燃えている！！', 300, 150);
-
-            // Draw LAVA Overlay on floor
-            ctx.fillStyle = 'rgba(255, 69, 0, 0.7)';
-            ctx.fillRect(0, 500, canvas.width, 50); // Visual lava on floor
+            ctx.font = 'bold 50px Arial';
+            ctx.fillText('レーザーがくるぞ！！', 250, 150);
         } else {
-            // COUNTDOWN
-            ctx.fillStyle = timeLeft <= 3 ? 'red' : 'white';
-            ctx.font = 'bold 30px Arial';
-            ctx.fillText('炎上まで: ' + timeLeft, 350, 100);
-
+            ctx.fillText('レーザー攻撃まで: ' + timeLeft, 350, 100);
             if (timeLeft <= 3) {
                 ctx.font = 'bold 50px Arial';
-                ctx.fillText('逃げろ！', 350, 150);
-
-                // Warning Flash on floor
-                if (boss.fireTimer % 10 < 5) {
-                    ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
-                    ctx.fillRect(0, 500, canvas.width, 50);
-                }
+                ctx.fillText('キケン！', 350, 150);
             }
         }
     }
@@ -1304,16 +1318,51 @@ function draw() {
         ctx.fillRect(laser.x, laser.y, laser.width, laser.height);
     });
 
-    // Draw Enemy Projectiles (Fireballs / Poison)
+    // Draw Enemy Projectiles (Fireballs / Poison / Boss Lasers)
     enemyProjectiles.forEach(p => {
-        ctx.fillStyle = p.color ? p.color : 'orange'; // Respects 'purple' for poison
-        ctx.beginPath();
-        ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = p.isPoison ? 'black' : 'red';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        if (p.isLaser) {
+            ctx.save();
+            ctx.translate(p.x + p.width / 2, p.y + p.height / 2);
+            ctx.rotate(p.angle);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+            // Glow effect
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'white';
+            ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+            ctx.restore();
+        } else {
+            ctx.fillStyle = p.color ? p.color : 'orange'; // Respects 'purple' for poison
+            ctx.beginPath();
+            ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = p.isPoison ? 'black' : 'red';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
     });
+
+    // Draw Laser Warnings
+    let bossInDraw = enemies.find(e => e.type === 'boss');
+    if (bossInDraw && bossInDraw.laserWarningTimer > 0 && bossInDraw.potentialLasers) {
+        ctx.save();
+        ctx.strokeStyle = '#FF3300'; // Bright Orange/Red
+        ctx.lineWidth = 4;
+        ctx.setLineDash([]); // Solid lines for better visibility
+        ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 100) * 0.3; // Slower pulsing
+        
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = 'red';
+
+        bossInDraw.potentialLasers.forEach(p => {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            let lineLen = 2500;
+            ctx.lineTo(p.x + Math.cos(p.angle) * lineLen, p.y + Math.sin(p.angle) * lineLen);
+            ctx.stroke();
+        });
+        ctx.restore();
+    }
 
     // Draw Player
     let shouldDraw = true;

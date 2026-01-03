@@ -858,7 +858,7 @@ function update() {
                 let py = player.y + player.height / 2;
                 let dist = Math.sqrt((px - bx) ** 2 + (py - by) ** 2);
 
-                if (dist < 200) { // 2m Check
+                if (dist < 700) { // 70m Check
                     hit = false;
                     // Optional: Visual feedback "SAFE" popup?
                 }

@@ -2,6 +2,10 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // Game Variables
+window.onerror = function (msg, url, line, col, error) {
+    alert("Error: " + msg + "\nLine: " + line + "\nCol: " + col);
+};
+
 let player = {
     x: 20,
     y: 400, // Spawn in air to land safely
@@ -77,19 +81,22 @@ let camera = { x: 0, y: 0 };
 let characters = [];
 for (let i = 0; i < 10; i++) {
     let img = new Image();
-    img.src = `ryoppy_${i}.png`;
+    img.src = `assets/ryoppy_${i}.png`;
     characters.push(img);
 }
 let playerImg = characters[0]; // Default
 
 const ballImg = new Image();
-ballImg.src = 'ball.png';
+ballImg.src = 'assets/ball.png';
 
 const ironBallImg = new Image();
-ironBallImg.src = 'iron_ball.png';
+ironBallImg.src = 'assets/iron_ball.png';
+
+const awakenedBossImg = new Image();
+awakenedBossImg.src = 'assets/kakusei_dragon.png';
 
 const chestImg = new Image();
-chestImg.src = 'chest.png';
+chestImg.src = 'assets/chest.png';
 
 // Audio
 const bgm = new Audio('bgm.mp3');
@@ -150,7 +157,7 @@ const generateEnemies = (levelLen) => {
     let currentX = 800;
     while (currentX < levelLen - 1500) { // Stop earlier so Boss is alone
         // Chance to spawn enemy per segment
-        if (Math.random() < 0.7) {
+        if (Math.random() < 0.4) {
             let type = Math.random() < 0.3 ? 'strong' : 'normal';
             let yPos = Math.random() < 0.5 ? 400 : 200; // Ground or High
 
@@ -166,7 +173,7 @@ const generateEnemies = (levelLen) => {
                 maxHp: type === 'strong' ? 3 : 1
             });
         }
-        currentX += 300; // Space them out
+        currentX += 300; // Normal spacing
     }
     return enemiesList;
 };
@@ -246,10 +253,14 @@ function startNewGame(idx) {
     player.damageTaken = false;
     player.lastSafeX = 20;
     player.lastSafeY = 400;
+    player.ultimateCooldown = 0; // Reset Ult Cooldown on new game
 
     // Reset Objects
     lasers = [];
+    lasers = [];
     enemyProjectiles = [];
+    specialChest = null;
+    victoryDancePlayers = [];
 
     // BOSS MODE LOGIC
     if (bossMode) {
@@ -273,27 +284,45 @@ function startNewGame(idx) {
     }
 
     // Set Level
+    if (bossMode) {
+        selectedLevelLength = 1000; // Force short level for immediate battle
+    }
     levelWidth = selectedLevelLength;
     goal.x = levelWidth - 200;
     goal.active = false; // Hidden until boss defeated
 
     // Add Boss Enemy
     let isSuper = bossMode;
+    // User Request: Instant Hydra if Super Boss Mode
+    let startAwakened = isSuper;
+
     enemies.push({
-        x: levelWidth - 400,
-        y: 200, // On platform
-        width: isSuper ? 150 : 100, // Big or HUGE
+        x: isSuper ? 500 : levelWidth - 400, // Spawn close (500) if Super
+        y: 200,
+        width: isSuper ? 150 : 100,
         height: isSuper ? 150 : 100,
-        speed: 2,
+        speed: isSuper ? 3 : 2, // Faster if Super
         dir: -1,
         type: 'boss',
-        hp: isSuper ? 100 : 30,
-        maxHp: isSuper ? 100 : 30,
-        nextShot: 100, // Cooldown for fireball
+        hp: isSuper ? 300 : 30, // 300 HP for Hydra
+        maxHp: isSuper ? 300 : 30,
+        nextShot: 100,
         isSuper: isSuper,
-        fireTimer: 600, // 10 seconds for Fire Attack
+        isAwakened: startAwakened, // Start as Hydra immediately
+        awakeningWave: startAwakened ? 0 : undefined, // Start effect
+        color: startAwakened ? 'purple' : 'red',
+        fireTimer: 600,
         fireActiveTimer: 0
     });
+
+    if (bossMode) {
+        // SUPER BUFF for Player
+        player.maxHp = 20;
+        player.hp = 20;
+    } else {
+        player.maxHp = 4; // Normal
+        player.hp = 4;
+    }
 
     // Add Goal Platform
     platforms.push({
@@ -539,34 +568,6 @@ canvas.addEventListener('click', function (e) {
 });
 
 function update() {
-    if (gameState !== 'PLAYING') return;
-    // Check Goal Collision
-    // ... (Existing Goal Logic)
-
-    // CHECK CHEST COLLISION (Victory Dance Trigger)
-    if (specialChest && specialChest.active &&
-        player.x < specialChest.x + specialChest.width &&
-        player.x + player.width > specialChest.x &&
-        player.y < specialChest.y + specialChest.height &&
-        player.y + player.height > specialChest.y) {
-
-        // TRIGGER VICTORY DANCE
-        gameState = 'VICTORY_DANCE';
-        specialChest.active = false;
-
-        // Spawn Clones
-        for (let i = 0; i < 10; i++) {
-            victoryDancePlayers.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * 500,
-                dx: (Math.random() - 0.5) * 10,
-                dy: (Math.random() - 0.5) * 10,
-                color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-                rotation: 0
-            });
-        }
-    }
-
     // UPDATE VICTORY DANCE
     if (gameState === 'VICTORY_DANCE') {
         victoryDancePlayers.forEach(p => {
@@ -583,6 +584,41 @@ function update() {
         });
         return; // Skip normal update
     }
+
+    if (gameState !== 'PLAYING') return;
+    // Check Goal Collision
+    // ... (Existing Goal Logic)
+
+    // CHECK CHEST COLLISION (Victory Dance Trigger)
+    if (specialChest && specialChest.active &&
+        player.x < specialChest.x + specialChest.width &&
+        player.x + player.width > specialChest.x &&
+        player.y < specialChest.y + specialChest.height &&
+        player.y + player.height > specialChest.y) {
+
+        // TRIGGER VICTORY DANCE
+        gameState = 'VICTORY_DANCE';
+        specialChest.active = false;
+
+        // SAVE VICTORY RECORD
+        try {
+            localStorage.setItem('ryosuke_super_win', 'true');
+        } catch (e) { console.log('Storage failed', e); }
+
+        // Spawn Clones
+        for (let i = 0; i < 10; i++) {
+            victoryDancePlayers.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * 500,
+                dx: (Math.random() - 0.5) * 10,
+                dy: (Math.random() - 0.5) * 10,
+                color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                rotation: 0
+            });
+        }
+    }
+
+
 
     if (gameWon) return;
 
@@ -619,8 +655,13 @@ function update() {
                 player.y < p.y + p.height &&
                 player.y + player.height > p.y) {
 
-                takeDamage(false);
-                enemyProjectiles.splice(i, 1); // Hit and disappear
+                if (player.isSuperInvincible) {
+                    enemyProjectiles.splice(i, 1);
+                } else {
+                    let dmg = p.isPoison ? 3 : 1;
+                    takeDamage(false, dmg);
+                    enemyProjectiles.splice(i, 1);
+                }
             }
         }
 
@@ -635,24 +676,18 @@ function update() {
                 if (enemy.type === 'strong') {
                     if (laser.isStrong) {
                         enemies.splice(j, 1); // Kill strong enemy!
-                        lasers.splice(i, 1);
+                        if (!laser.isPiercing) lasers.splice(i, 1);
                     } else {
                         lasers.splice(i, 1); // Normal laser dies
                     }
                 } else if (enemy.type === 'boss') {
                     let damage = laser.isStrong ? 3 : 1;
                     enemy.hp -= damage;
-                    lasers.splice(i, 1); // Laser disappears
-                    if (enemy.hp <= 0) {
-                        enemies.splice(j, 1); // Boss Dies
-                        goal.active = true; // Spawn Chest
-
-                        // Create Boss Explosion Effect (Optional simple visual)
-                        // For now just disappear
-                    }
+                    if (!laser.isPiercing) lasers.splice(i, 1); // Laser disappears
+                    /* Logic Moved to Main Loop */
                 } else {
                     enemies.splice(j, 1);
-                    lasers.splice(i, 1);
+                    if (!laser.isPiercing) lasers.splice(i, 1);
                 }
                 break;
             }
@@ -855,24 +890,45 @@ function update() {
                 if (distX < 800) {
                     if (enemy.nextShot > 0) enemy.nextShot--;
                     else {
-                        // SHOOT FIREBALL
+                        // SHOOT FIREBALL (Regular) or POISON BALL (Awakened)
+                        let isPoison = enemy.isAwakened;
+
                         let angle = Math.atan2(
                             (player.y + player.height / 2) - (enemy.y + enemy.height / 2),
                             (player.x + player.width / 2) - (enemy.x + enemy.width / 2)
                         );
                         let speed = enemy.isSuper ? 10 : 6; // Fast shot for Super Boss
 
-                        enemyProjectiles.push({
-                            x: enemy.x + enemy.width / 2 - 10,
-                            y: enemy.y + enemy.height / 2 - 10,
-                            width: 20,
-                            height: 20,
-                            vx: Math.cos(angle) * speed,
-                            vy: Math.sin(angle) * speed,
-                            color: 'red'
-                        });
-
-                        enemy.nextShot = enemy.isSuper ? 120 : 240; // Super Boss shoots 2x faster
+                        if (isPoison) {
+                            // TRIPLE POISON SHOT (Hydra)
+                            let offsets = [-0.3, 0, 0.3];
+                            offsets.forEach(offset => {
+                                enemyProjectiles.push({
+                                    x: enemy.x + enemy.width / 2 - 10,
+                                    y: enemy.y + enemy.height / 2 - 10,
+                                    width: 30, // Bigger
+                                    height: 30,
+                                    vx: Math.cos(angle + offset) * speed,
+                                    vy: Math.sin(angle + offset) * speed,
+                                    color: 'purple',
+                                    isPoison: true
+                                });
+                            });
+                            enemy.nextShot = 90; // Rapid Fire (1.5s)
+                        } else {
+                            // Normal Shot
+                            enemyProjectiles.push({
+                                x: enemy.x + enemy.width / 2 - 10,
+                                y: enemy.y + enemy.height / 2 - 10,
+                                width: 20,
+                                height: 20,
+                                vx: Math.cos(angle) * speed,
+                                vy: Math.sin(angle) * speed,
+                                color: 'red',
+                                isPoison: false
+                            });
+                            enemy.nextShot = enemy.isSuper ? 120 : 240;
+                        }
                     }
                 }
 
@@ -889,7 +945,7 @@ function update() {
 
                         // Damage Player if on ground (y > 450 approx)
                         if (player.y >= 449 && player.grounded) {
-                            takeDamage(false); // Burn!!
+                            takeDamage(false, 1); // Burn!!
                         }
                     } else {
                         // Countdown
@@ -941,7 +997,7 @@ function update() {
                     }
                 }
             } else {
-                takeDamage(false); // false = enemy touch
+                takeDamage(false, 1); // false = enemy touch
             }
         }
     }
@@ -962,12 +1018,73 @@ function update() {
     // Clamp camera within level bounds
     if (camera.x < 0) camera.x = 0;
     if (camera.x > levelWidth - canvas.width) camera.x = levelWidth - canvas.width;
+
+    // CHECK BOSS DEATH / AWAKENING
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let enemy = enemies[i];
+
+        if (enemy.hp <= 0 && enemy.type === 'boss') {
+            if (enemy.isSuper) {
+                if (!enemy.isAwakened) {
+                    // --- AWAKENING EVENT ---
+                    enemy.isAwakened = true;
+                    enemy.hp = 300;
+                    enemy.maxHp = 300;
+                    enemy.color = 'purple';
+                    enemy.awakeningWave = 0;
+                    enemy.speed = 3;
+
+                    // Player Buff
+                    player.maxHp = 20;
+                    player.hp = 20;
+                    enemy.x += 100;
+                }
+                else {
+                    // --- TRUE DEATH (Hydra Defeated) ---
+                    enemy.hp = 0;
+                    gameState = 'VICTORY_DANCE';
+                    if (specialChest) specialChest.active = false;
+
+                    try {
+                        localStorage.setItem('ryosuke_super_win', 'true');
+                    } catch (e) { console.log('Storage failed', e); }
+
+                    // Spawn Clones
+                    for (let k = 0; k < 10; k++) {
+                        victoryDancePlayers.push({
+                            x: Math.random() * canvas.width,
+                            y: Math.random() * 500,
+                            dx: (Math.random() - 0.5) * 10,
+                            dy: (Math.random() - 0.5) * 10,
+                            color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                            rotation: 0
+                        });
+                    }
+                    enemies.splice(i, 1); // Remove Hydra!
+                }
+            } else {
+                // --- NORMAL BOSS DEATH ---
+                goal.x = enemy.x;
+                goal.y = enemy.y + enemy.height - goal.height;
+                goal.active = true;
+                enemies.splice(i, 1); // Remove Normal Boss
+            }
+        }
+
+        // UPDATE WAVE
+        enemies.forEach(e => {
+            if (e.isAwakened && e.awakeningWave !== undefined) {
+                e.awakeningWave += 15; // Expand speed
+                if (e.awakeningWave > 2000) e.awakeningWave = undefined; // Stop
+            }
+        });
+    }
 }
 
-function takeDamage(isLava) {
+function takeDamage(isLava, amount = 1) {
     if (player.invincible > 0) return;
 
-    player.hp--;
+    player.hp -= amount;
     player.invincible = 60; // 1 second invincibility
     player.damageTaken = true; // Flawless run failed
 
@@ -1011,6 +1128,19 @@ function draw() {
         ctx.fillStyle = 'white';
         ctx.font = '40px Arial';
         ctx.fillText('キャラクターをえらんでね！', 150, 100);
+
+        // CHECK BADGE
+        let hasBadge = localStorage.getItem('ryosuke_super_win');
+        if (hasBadge === 'true') {
+            // Draw Badge
+            ctx.filter = 'drop-shadow(0px 0px 5px gold)';
+            ctx.fillStyle = 'gold';
+            ctx.font = '40px Arial';
+            ctx.fillText('👑', 30, 460); // Crown icon (Bottom Left)
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText('真の勇者', 70, 460); // Text next to crown
+            ctx.filter = 'none';
+        }
 
         // LENGTH SELECTION UI
         const lengths = [2000, 4000, 6000, 8000, 10000];
@@ -1157,13 +1287,13 @@ function draw() {
         ctx.fillRect(laser.x, laser.y, laser.width, laser.height);
     });
 
-    // Draw Enemy Projectiles (Fireballs)
+    // Draw Enemy Projectiles (Fireballs / Poison)
     enemyProjectiles.forEach(p => {
-        ctx.fillStyle = 'orange';
+        ctx.fillStyle = p.color ? p.color : 'orange'; // Respects 'purple' for poison
         ctx.beginPath();
         ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = 'red';
+        ctx.strokeStyle = p.isPoison ? 'black' : 'red';
         ctx.lineWidth = 2;
         ctx.stroke();
     });
@@ -1229,19 +1359,48 @@ function draw() {
                     ctx.scale(-1, 1);
                 }
 
-                // Draw Big
-                ctx.drawImage(bossImg, -enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+                if (enemy.isAwakened) {
+                    // --- AWAKENED (Custom Image) ---
+                    if (awakenedBossImg && awakenedBossImg.complete) {
+                        ctx.save();
+                        // Swaying Effect for whole body or internal heads?
+                        // Determine Sway
+                        let swayX = Math.sin(Date.now() / 300) * 5;
+                        let swayY = Math.cos(Date.now() / 300) * 5;
+
+                        ctx.translate(swayX, swayY); // Apply sway relative to the current origin (boss center)
+
+                        // Draw Bigger for impact
+                        let drawW = enemy.width * 1.5;
+                        let drawH = enemy.height * 1.5;
+
+                        ctx.drawImage(awakenedBossImg, -drawW / 2, -drawH / 2, drawW, drawH);
+                        ctx.restore();
+                    }
+                } else {
+                    // NORMAL BOSS (Dragon)
+                    // Draw Big
+                    ctx.drawImage(bossImg, -enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+                }
+
+                /* 
+                // --- OLD MANUAL HYDRA MODE (Removed/Fallback Logic handling above) ---
+                if (enemy.isAwakened) { ... }
+                */
+
                 ctx.restore();
+
+
             } else {
                 // Fallback
-                ctx.fillStyle = 'red';
+                ctx.fillStyle = enemy.isAwakened ? 'purple' : 'red';
                 ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
             }
 
             // Draw Boss HP Bar
             ctx.fillStyle = 'black';
             ctx.fillRect(enemy.x, enemy.y - 20, enemy.width, 10);
-            ctx.fillStyle = 'green';
+            ctx.fillStyle = enemy.isAwakened ? 'purple' : 'green';
             let hpPercent = Math.max(0, enemy.hp / enemy.maxHp);
             ctx.fillRect(enemy.x, enemy.y - 20, enemy.width * hpPercent, 10);
             return;
@@ -1464,12 +1623,13 @@ function draw() {
         ctx.textAlign = 'start'; // Reset alignment
     }
 
-    // DRAW VICTORY DANCE
+    // DRAW VICTORY DANCE (Overlay)
     if (gameState === 'VICTORY_DANCE') {
-        // Background
-        ctx.fillStyle = 'black'; // Disco black
-        // Flashing background?
-        if (Math.random() > 0.5) ctx.fillStyle = '#111';
+        // Semi-transparent overlay to darken game world but keep it visible
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        // Flashing background effect (Disco lights)
+        if (Math.random() > 0.8) ctx.fillStyle = `hsla(${Math.random() * 360}, 50%, 50%, 0.3)`;
+
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Draw Clones
@@ -1477,10 +1637,14 @@ function draw() {
             ctx.save();
             ctx.translate(p.x, p.y);
             ctx.rotate(p.rotation);
-            // Draw Player Image but tint it? 
-            // Canvas doesn't support easy tinting of images without offscreen canvas.
-            // Let's just draw the image rotating.
-            ctx.drawImage(playerImg, -30, -30, 60, 60);
+
+            // Draw Player Image
+            if (playerImg.complete) {
+                ctx.drawImage(playerImg, -30, -30, 60, 60);
+            } else {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-30, -30, 60, 60);
+            }
 
             // Add colorful border
             ctx.strokeStyle = p.color;
@@ -1489,12 +1653,20 @@ function draw() {
             ctx.restore();
         });
 
+        // VICTORY TEXT
+        ctx.save();
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 10;
         ctx.fillStyle = 'gold';
         ctx.font = '80px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('SUPER VICTORY!!', canvas.width / 2, 200);
+
         ctx.font = '40px Arial';
-        ctx.fillText('最高のダンスだ！', canvas.width / 2, 300);
+        ctx.fillStyle = 'white';
+        ctx.fillText('ヒュドラ討伐おめでとう！', canvas.width / 2, 300);
+        ctx.fillText('F5キーで タイトルへ', canvas.width / 2, 500);
+        ctx.restore();
 
         ctx.textAlign = 'left';
     }
@@ -1540,6 +1712,8 @@ function gameLoop() {
     draw();
     requestAnimationFrame(gameLoop);
 }
+
+
 
 // --- MOBILE TOUCH CONTROLS ---
 
@@ -1594,20 +1768,14 @@ function activateUltimate() {
         player.ultimateActive = 900;
     }
     else if (charIdx === 6) { // Orange: Giga Beam
-        lasers.push({
-            x: player.x, y: player.y + 10,
-            width: canvas.width, height: 30,
-            vx: 0, vy: 0, // Stationary (or move with player)
-            color: 'orange', isStrong: true,
-            life: 60 // Special property for beam duration? 
-            // Simplified: Just a super fast long projectile
-        });
-        // Actually, let's make it a huge projectile
+        // Huge Piercing Beam
         lasers.push({
             x: player.x + 50, y: player.y,
             width: 800, height: 60,
             vx: 30, vy: 0,
-            color: 'orange', isStrong: true
+            color: 'orange',
+            isStrong: true,
+            isPiercing: true // Don't disappear on hit
         });
     }
     else if (charIdx === 7) { // Light Blue: Light Speed
@@ -1624,7 +1792,6 @@ function activateUltimate() {
         if (player.hp < player.maxHp) player.hp++;
     }
 }
-
 
 
 function drawVirtualControls() {
@@ -1862,3 +2029,4 @@ canvas.addEventListener('mouseout', function (e) {
 });
 
 gameLoop();
+

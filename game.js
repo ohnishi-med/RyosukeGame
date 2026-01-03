@@ -422,7 +422,74 @@ document.addEventListener('keydown', function (e) {
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.code) > -1) {
         e.preventDefault();
     }
+
+    // Ability Activation (C Key)
+    if (e.code === 'KeyC') {
+        if (!e.repeat) activateActiveAbility();
+    }
 });
+
+// Helper Function for Active Abilities
+function activateActiveAbility() {
+    if (gameState !== 'PLAYING') return;
+
+    // Heal (Red)
+    if (player.canHeal && !player.healUsed) {
+        if (player.hp < player.maxHp) {
+            player.hp++;
+            player.healUsed = true;
+        }
+    }
+
+    // Fly (Yellow)
+    if (player.canFly && !player.flyUsed && !player.isFlying) {
+        player.isFlying = true;
+        player.flyUsed = true;
+        player.dy = 0; // Stop falling
+        player.flyTimer = 600; // 10 seconds
+    }
+
+    // Time Stop (Pink)
+    if (player.canTimeStop && !player.timeStopUsed && !player.isTimeStopped) {
+        player.isTimeStopped = true;
+        player.timeStopUsed = true;
+        player.timeStopTimer = 600; // 10 seconds
+    }
+
+    // Attack Boost (Purple)
+    if (player.canInvincible && !player.invincibleUsed && !player.isAttackBoost) {
+        player.isAttackBoost = true;
+        player.invincibleUsed = true;
+        player.ultimateActive = 1200; // 20s
+    }
+
+    // Speed Up (Light Blue)
+    if (player.canSpeedUp && !player.speedUpUsed && !player.isSpeedUp) {
+        player.isSpeedUp = true;
+        player.speedUpUsed = true;
+        player.speedUpTimer = 600; // 10 seconds
+    }
+
+    // Build Bridge (Black)
+    if (player.canBuildBridge && !player.bridgeBuilt) {
+        // Create 100m Bridge (1000px)
+        platforms.push({
+            x: player.x,
+            y: player.y + player.height + 5, // Under feet
+            width: 1000,
+            height: 20,
+            color: 'black'
+        });
+        player.bridgeBuilt = true;
+        player.dy = 0;
+        player.y -= 5;
+    }
+
+    // Block Builder (Grey)
+    if (player.canPlaceBlock && player.blockCount > 0) {
+        player.isPlacingBlock = !player.isPlacingBlock; // Toggle Mode
+    }
+}
 
 document.addEventListener('keyup', function (e) {
     keys[e.code] = false;

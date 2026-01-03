@@ -1332,8 +1332,15 @@ function draw() {
     ctx.save();
     ctx.translate(-camera.x, 0); // Move everything left by camera.x
 
-    // Draw Floor (LAVA Removed - Normal Floor)
-    ctx.fillStyle = '#654321'; // Dark Brown
+    // Draw Floor (LAVA)
+    // Dynamic Lava Gradient
+    let lavaGradient = ctx.createLinearGradient(0, 550, 0, 600);
+    // Pulsing red colors
+    let pulse = Math.sin(Date.now() / 500) * 20;
+    lavaGradient.addColorStop(0, `rgb(${230 + pulse}, 50, 0)`); // Bright Red/Orange
+    lavaGradient.addColorStop(1, `rgb(${180 + pulse}, 20, 0)`); // Darker Red
+
+    ctx.fillStyle = lavaGradient;
     ctx.fillRect(0, 550, levelWidth, 50);
 
     // Draw Platforms

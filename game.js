@@ -625,50 +625,20 @@ function update() {
 
     if (gameWon) return;
 
-    // Laser Movement & Collision
+        // Laser Movement & Collision (Player Lasers)
     for (let i = lasers.length - 1; i >= 0; i--) {
         let laser = lasers[i];
 
-        // Move Laser (Now supports vectors)
+        // Move Laser
         laser.x += laser.vx;
         laser.y += laser.vy;
 
-        if (laser.x < 0 || laser.x > levelWidth || laser.y < 0 || laser.y > canvas.height + 200) { // Cleanup off-screen
+        if (laser.x < 0 || laser.x > levelWidth || laser.y < 0 || laser.y > canvas.height + 200) {
             lasers.splice(i, 1);
             continue;
         }
 
-        // PROJECTILE LOGIC
-        for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
-            let p = enemyProjectiles[i];
-            if (!player.isTimeStopped) {
-                p.x += p.vx;
-                p.y += p.vy;
-            }
-
-            // Remove if OOB
-            if (p.x < 0 || p.x > levelWidth || p.y < 0 || p.y > canvas.height) {
-                enemyProjectiles.splice(i, 1);
-                continue;
-            }
-
-            // Collision with Player
-            if (player.x < p.x + p.width &&
-                player.x + player.width > p.x &&
-                player.y < p.y + p.height &&
-                player.y + player.height > p.y) {
-
-                if (player.isSuperInvincible) {
-                    enemyProjectiles.splice(i, 1);
-                } else {
-                    let dmg = p.isPoison ? 3 : 1;
-                    takeDamage(false, dmg);
-                    enemyProjectiles.splice(i, 1);
-                }
-            }
-        }
-
-        // Check collision with enemies
+        // Check collision with enemies (Moved Logic Here)
         for (let j = enemies.length - 1; j >= 0; j--) {
             let enemy = enemies[j];
             if (laser.x < enemy.x + enemy.width &&
@@ -677,24 +647,21 @@ function update() {
                 laser.y + laser.height > enemy.y) {
 
                 if (enemy.type === 'strong') {
-                    if (laser.isStrong) {
-                        enemies.splice(j, 1); // Kill strong enemy!
+                     if (laser.isStrong) {
+                        enemies.splice(j, 1);
                         if (!laser.isPiercing) lasers.splice(i, 1);
                     } else if (player.isAttackBoost) {
-                        // Boost damage for normal laser vs strong
                         enemy.hp -= 2.5;
                         if (enemy.hp <= 0) enemies.splice(j, 1);
                         lasers.splice(i, 1);
                     } else {
-                        lasers.splice(i, 1); // Normal laser dies
+                        lasers.splice(i, 1);
                     }
                 } else if (enemy.type === 'boss') {
                     let damage = laser.isStrong ? 3 : 1;
-                    if (player.isAttackBoost) damage *= 2.5; // 2.5x Damage!
-
+                    if (player.isAttackBoost) damage *= 2.5;
                     enemy.hp -= damage;
-                    if (!laser.isPiercing) lasers.splice(i, 1); // Laser disappears
-                    /* Logic Moved to Main Loop */
+                    if (!laser.isPiercing) lasers.splice(i, 1);
                 } else {
                     enemies.splice(j, 1);
                     if (!laser.isPiercing) lasers.splice(i, 1);
@@ -704,7 +671,80 @@ function update() {
         }
     }
 
-    // Movement logic
+
+    // Enemy Projectile Logic (Moved Outside)
+    for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+        let p = enemyProjectiles[i];
+        if (!player.isTimeStopped) {
+            p.x += p.vx;
+            p.y += p.vy;
+        }
+
+        // Cleanup (Allow lasers to be big/offscreen as long as origin is reasonable? Or just large bounds)
+        // For beams, width is 2000, so we check origin.
+        if (p.x < -2000 || p.x > levelWidth + 2000 || p.y < -2000 || p.y > canvas.height + 2000) {
+            enemyProjectiles.splice(i, 1);
+            continue;
+        }
+
+        // COLLISION
+        let hit = false;
+        
+        if (p.isLaser) {
+            // BEAM COLLISION (Line vs Circle approx)
+            // Beam segment from (p.x, p.y) to (endX, endY)
+            let len = p.width; // Width is length
+            let endX = p.x + Math.cos(p.angle) * len;
+            let endY = p.y + Math.sin(p.angle) * len;
+
+            // Player Center
+            let cx = player.x + player.width / 2;
+            let cy = player.y + player.height / 2;
+            let r = Math.max(player.width, player.height) / 2;
+
+            // Distance from point C to segment AB
+            let A = {x: p.x, y: p.y};
+            let B = {x: endX, y: endY};
+            let C = {x: cx, y: cy};
+
+            let AB = {x: B.x - A.x, y: B.y - A.y};
+            let AC = {x: C.x - A.x, y: C.y - A.y};
+            
+            let t = (AC.x * AB.x + AC.y * AB.y) / (len * len);
+            t = Math.max(0, Math.min(1, t)); // Clamp to segment
+
+            let closest = {x: A.x + t * AB.x, y: A.y + t * AB.y};
+            let distSq = (C.x - closest.x)**2 + (C.y - closest.y)**2;
+            
+            // Hit radius: beam thickness/2 + player radius
+            let hitR = (p.height / 2) + r;
+
+            if (distSq < hitR * hitR) {
+                hit = true;
+            }
+
+        } else {
+            // STANDARD AABB
+            if (player.x < p.x + p.width &&
+                player.x + player.width > p.x &&
+                player.y < p.y + p.height &&
+                player.y + player.height > p.y) {
+                hit = true;
+            }
+        }
+
+        if (hit) {
+            if (player.isSuperInvincible) {
+                 enemyProjectiles.splice(i, 1);
+            } else {
+                let dmg = p.isPoison ? 3 : 1;
+                takeDamage(false, dmg);
+                if (!p.isLaser) enemyProjectiles.splice(i, 1); // Beams don't disappear on hit
+            }
+        }
+    }
+
+// Movement logic
     let currentSpeed = player.speed;
     if (player.isSpeedUp) currentSpeed *= 2; // Double Speed!
 
@@ -918,8 +958,8 @@ function update() {
                         let speed = enemy.isSuper ? 10 : 6; // Fast shot for Super Boss
 
                         if (isPoison) {
-                            // TRIPLE POISON SHOT (Hydra)
-                            let offsets = [-0.3, 0, 0.3];
+                            // DOUBLE POISON SHOT (Hydra) - Reduced from Triple
+                            let offsets = [-0.15, 0.15];
                             offsets.forEach(offset => {
                                 enemyProjectiles.push({
                                     x: enemy.x + enemy.width / 2 - 10,
@@ -932,7 +972,7 @@ function update() {
                                     isPoison: true
                                 });
                             });
-                            enemy.nextShot = 90; // Rapid Fire (1.5s)
+                            enemy.nextShot = 120; // Reduced frequency (2.0s)
                         } else {
                             // Normal Shot
                             enemyProjectiles.push({
@@ -962,7 +1002,7 @@ function update() {
                     } else if (enemy.laserWarningTimer === 0 && (!enemy.potentialLasers || enemy.potentialLasers.length === 0)) {
                         // START WARNING PHASE
                         enemy.potentialLasers = [];
-                        for (let i = 0; i < 8; i++) {
+                        for (let i = 0; i < 4; i++) {
                             let side = Math.floor(Math.random() * 3);
                             let startX, startY;
                             if (side === 0) { startX = camera.x + Math.random() * canvas.width; startY = -50; }
@@ -989,8 +1029,7 @@ function update() {
                                 enemyProjectiles.push({
                                     x: p.x,
                                     y: p.y,
-                                    width: 40,
-                                    height: 8,
+                                    width: 2000, height: 24,
                                     vx: Math.cos(p.angle) * speed,
                                     vy: Math.sin(p.angle) * speed,
                                     color: 'magenta',
@@ -1322,14 +1361,14 @@ function draw() {
     enemyProjectiles.forEach(p => {
         if (p.isLaser) {
             ctx.save();
-            ctx.translate(p.x + p.width / 2, p.y + p.height / 2);
+            ctx.translate(p.x, p.y);
             ctx.rotate(p.angle);
             ctx.fillStyle = p.color;
-            ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+            ctx.fillRect(0, -p.height / 2, p.width, p.height);
             // Glow effect
             ctx.shadowBlur = 10;
             ctx.shadowColor = 'white';
-            ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+            ctx.fillRect(0, -p.height / 2, p.width, p.height);
             ctx.restore();
         } else {
             ctx.fillStyle = p.color ? p.color : 'orange'; // Respects 'purple' for poison

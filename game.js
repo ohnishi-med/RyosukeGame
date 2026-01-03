@@ -306,15 +306,16 @@ function startNewGame(idx) {
         speed: isSuper ? 3 : 2, // Faster if Super
         dir: -1,
         type: 'boss',
-        hp: isSuper ? 300 : 30, // 300 HP for Hydra
-        maxHp: isSuper ? 300 : 30,
+        hp: isSuper ? 150 : 30, // 300 HP for Hydra
+        maxHp: isSuper ? 150 : 30,
         nextShot: 100,
         isSuper: isSuper,
         isAwakened: startAwakened, // Start as Hydra immediately
         awakeningWave: startAwakened ? 0 : undefined, // Start effect
         color: startAwakened ? 'purple' : 'red',
-        fireTimer: 600,
-        fireActiveTimer: 0
+        laserTimer: 600, // 10 seconds
+        laserWarningTimer: 0,
+        potentialLasers: []
     });
 
     if (bossMode) {
@@ -624,50 +625,20 @@ function update() {
 
     if (gameWon) return;
 
-    // Laser Movement & Collision
+    // Laser Movement & Collision (Player Lasers)
     for (let i = lasers.length - 1; i >= 0; i--) {
         let laser = lasers[i];
 
-        // Move Laser (Now supports vectors)
+        // Move Laser
         laser.x += laser.vx;
         laser.y += laser.vy;
 
-        if (laser.x < 0 || laser.x > levelWidth || laser.y < 0 || laser.y > canvas.height + 200) { // Cleanup off-screen
+        if (laser.x < 0 || laser.x > levelWidth || laser.y < 0 || laser.y > canvas.height + 200) {
             lasers.splice(i, 1);
             continue;
         }
 
-        // PROJECTILE LOGIC
-        for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
-            let p = enemyProjectiles[i];
-            if (!player.isTimeStopped) {
-                p.x += p.vx;
-                p.y += p.vy;
-            }
-
-            // Remove if OOB
-            if (p.x < 0 || p.x > levelWidth || p.y < 0 || p.y > canvas.height) {
-                enemyProjectiles.splice(i, 1);
-                continue;
-            }
-
-            // Collision with Player
-            if (player.x < p.x + p.width &&
-                player.x + player.width > p.x &&
-                player.y < p.y + p.height &&
-                player.y + player.height > p.y) {
-
-                if (player.isSuperInvincible) {
-                    enemyProjectiles.splice(i, 1);
-                } else {
-                    let dmg = p.isPoison ? 3 : 1;
-                    takeDamage(false, dmg);
-                    enemyProjectiles.splice(i, 1);
-                }
-            }
-        }
-
-        // Check collision with enemies
+        // Check collision with enemies (Moved Logic Here)
         for (let j = enemies.length - 1; j >= 0; j--) {
             let enemy = enemies[j];
             if (laser.x < enemy.x + enemy.width &&
@@ -677,28 +648,98 @@ function update() {
 
                 if (enemy.type === 'strong') {
                     if (laser.isStrong) {
-                        enemies.splice(j, 1); // Kill strong enemy!
+                        enemies.splice(j, 1);
                         if (!laser.isPiercing) lasers.splice(i, 1);
                     } else if (player.isAttackBoost) {
-                        // Boost damage for normal laser vs strong
                         enemy.hp -= 2.5;
                         if (enemy.hp <= 0) enemies.splice(j, 1);
                         lasers.splice(i, 1);
                     } else {
-                        lasers.splice(i, 1); // Normal laser dies
+                        lasers.splice(i, 1);
                     }
                 } else if (enemy.type === 'boss') {
                     let damage = laser.isStrong ? 3 : 1;
-                    if (player.isAttackBoost) damage *= 2.5; // 2.5x Damage!
-
+                    if (player.isAttackBoost) damage *= 2.5;
                     enemy.hp -= damage;
-                    if (!laser.isPiercing) lasers.splice(i, 1); // Laser disappears
-                    /* Logic Moved to Main Loop */
+                    if (!laser.isPiercing) lasers.splice(i, 1);
                 } else {
                     enemies.splice(j, 1);
                     if (!laser.isPiercing) lasers.splice(i, 1);
                 }
                 break;
+            }
+        }
+    }
+
+
+    // Enemy Projectile Logic (Moved Outside)
+    for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+        let p = enemyProjectiles[i];
+        if (!player.isTimeStopped) {
+            p.x += p.vx;
+            p.y += p.vy;
+        }
+
+        // Cleanup (Allow lasers to be big/offscreen as long as origin is reasonable? Or just large bounds)
+        // For beams, width is 2000, so we check origin.
+        if (p.x < -2000 || p.x > levelWidth + 2000 || p.y < -2000 || p.y > canvas.height + 2000) {
+            enemyProjectiles.splice(i, 1);
+            continue;
+        }
+
+        // COLLISION
+        let hit = false;
+
+        if (p.isLaser) {
+            // BEAM COLLISION (Line vs Circle approx)
+            // Beam segment from (p.x, p.y) to (endX, endY)
+            let len = p.width; // Width is length
+            let endX = p.x + Math.cos(p.angle) * len;
+            let endY = p.y + Math.sin(p.angle) * len;
+
+            // Player Center
+            let cx = player.x + player.width / 2;
+            let cy = player.y + player.height / 2;
+            let r = Math.max(player.width, player.height) / 2;
+
+            // Distance from point C to segment AB
+            let A = { x: p.x, y: p.y };
+            let B = { x: endX, y: endY };
+            let C = { x: cx, y: cy };
+
+            let AB = { x: B.x - A.x, y: B.y - A.y };
+            let AC = { x: C.x - A.x, y: C.y - A.y };
+
+            let t = (AC.x * AB.x + AC.y * AB.y) / (len * len);
+            t = Math.max(0, Math.min(1, t)); // Clamp to segment
+
+            let closest = { x: A.x + t * AB.x, y: A.y + t * AB.y };
+            let distSq = (C.x - closest.x) ** 2 + (C.y - closest.y) ** 2;
+
+            // Hit radius: beam thickness/2 + player radius
+            let hitR = (p.height / 2) + r;
+
+            if (distSq < hitR * hitR) {
+                hit = true;
+            }
+
+        } else {
+            // STANDARD AABB
+            if (player.x < p.x + p.width &&
+                player.x + player.width > p.x &&
+                player.y < p.y + p.height &&
+                player.y + player.height > p.y) {
+                hit = true;
+            }
+        }
+
+        if (hit) {
+            if (player.isSuperInvincible) {
+                enemyProjectiles.splice(i, 1);
+            } else {
+                let dmg = p.isPoison ? 3 : 1;
+                takeDamage(false, dmg);
+                if (!p.isLaser) enemyProjectiles.splice(i, 1); // Beams don't disappear on hit
             }
         }
     }
@@ -917,8 +958,8 @@ function update() {
                         let speed = enemy.isSuper ? 10 : 6; // Fast shot for Super Boss
 
                         if (isPoison) {
-                            // TRIPLE POISON SHOT (Hydra)
-                            let offsets = [-0.3, 0, 0.3];
+                            // DOUBLE POISON SHOT (Hydra) - Reduced from Triple
+                            let offsets = [-0.15, 0.15];
                             offsets.forEach(offset => {
                                 enemyProjectiles.push({
                                     x: enemy.x + enemy.width / 2 - 10,
@@ -931,7 +972,7 @@ function update() {
                                     isPoison: true
                                 });
                             });
-                            enemy.nextShot = 90; // Rapid Fire (1.5s)
+                            enemy.nextShot = 120; // Reduced frequency (2.0s)
                         } else {
                             // Normal Shot
                             enemyProjectiles.push({
@@ -949,112 +990,58 @@ function update() {
                     }
                 }
 
-                // SUPER BOSS AI: Chase & Fire Attack
+                // SUPER BOSS AI: Chase & Laser Attack
                 if (enemy.isSuper) {
                     // 1. Chase Player (Slowly)
                     if (enemy.x < player.x - 200) enemy.x += 1;
                     if (enemy.x > player.x + 200) enemy.x -= 1;
 
-                    // 2. Poison Beam Logic (Hydra Only)
-                    if (enemy.isAwakened) {
-                        if (enemy.beamTimer > 0) {
-                            enemy.beamTimer--;
-                        } else {
-                            // Add New Beam Warning
-                            // Random Start Point (Relative to Camera -> World Coords)
+                    // 2. Laser Attack Logic (Every 10 seconds)
+                    if (enemy.laserTimer > 0) {
+                        enemy.laserTimer--;
+                    } else if (enemy.laserWarningTimer === 0 && (!enemy.potentialLasers || enemy.potentialLasers.length === 0)) {
+                        // START WARNING PHASE
+                        enemy.potentialLasers = [];
+                        for (let i = 0; i < 4; i++) {
+                            let side = Math.floor(Math.random() * 3);
                             let startX, startY;
-                            // Pick a side: Top, Bottom, Left, Right
-                            let side = Math.floor(Math.random() * 4);
-
-                            switch (side) {
-                                case 0: // Left
-                                    startX = camera.x;
-                                    startY = Math.random() * canvas.height;
-                                    break;
-                                case 1: // Right
-                                    startX = camera.x + canvas.width;
-                                    startY = Math.random() * canvas.height;
-                                    break;
-                                case 2: // Top
-                                    startX = camera.x + Math.random() * canvas.width;
-                                    startY = 0;
-                                    break;
-                                case 3: // Bottom
-                                    startX = camera.x + Math.random() * canvas.width;
-                                    startY = canvas.height;
-                                    break;
-                            }
-
-                            // Target Player (World Coords)
+                            if (side === 0) { startX = camera.x + Math.random() * canvas.width; startY = -50; }
+                            else if (side === 1) { startX = camera.x - 50; startY = Math.random() * 500; }
+                            else { startX = camera.x + canvas.width + 50; startY = Math.random() * 500; }
                             let angle = Math.atan2(
                                 (player.y + player.height / 2) - startY,
                                 (player.x + player.width / 2) - startX
                             );
 
-                            // Randomize angle start slightly
-                            angle += (Math.random() - 0.5) * 0.2;
-
-                            enemy.beams.push({
-                                x: startX,
-                                y: startY,
-                                angle: angle,
-                                state: 'warning', // warning -> firing
-                                timer: 90, // 1.5s Warning
-                                width: 40 // Beam width
-                            });
-                            // Cooldown
-                            enemy.beamTimer = 100; // 1.6 seconds
+                            enemy.potentialLasers.push({ x: startX, y: startY, angle: angle });
                         }
+                        enemy.laserWarningTimer = 90; // 1.5 second warning // 1 second warning
+                    }
 
-                        // Process Beams
-                        for (let b = enemy.beams.length - 1; b >= 0; b--) {
-                            let beam = enemy.beams[b];
-                            beam.timer--;
-
-                            if (beam.state === 'warning') {
-                                if (beam.timer <= 0) {
-                                    beam.state = 'firing';
-                                    beam.timer = 60; // Fire for 1 second
-                                }
-                            } else if (beam.state === 'firing') {
-                                // Collision Check Line-Rect
-                                // Simplified: Check if player center is close to line
-                                // P = Beam Start, V = Vector(cos, sin)
-                                // Q = Player Center
-                                // Dist = |(Q-P) x V| / |V| (2D cross product)
-
-                                let px = player.x + player.width / 2;
-                                let py = player.y + player.height / 2;
-
-                                let dx = Math.cos(beam.angle);
-                                let dy = Math.sin(beam.angle);
-
-                                // Vector from Beam Start to Player
-                                let v1x = px - beam.x;
-                                let v1y = py - beam.y;
-
-                                // Cross Product (2D) to find distance from line
-                                let dist = Math.abs(v1x * dy - v1y * dx);
-
-                                // Also project to ensure we are "in front" of beam start (dot product > 0)
-                                let dot = v1x * dx + v1y * dy;
-
-                                if (dist < beam.width / 2 + player.width / 2 && dot > 0) {
-                                    // Hit!
-                                    if (player.isSuperInvincible) {
-                                        // Invincible
-                                    } else {
-                                        takeDamage(false, 1);
-                                    }
-                                }
-
-                                if (beam.timer <= 0) {
-                                    enemy.beams.splice(b, 1);
-                                }
-                            }
+                    // Handle Warning Countdown and Firing
+                    if (enemy.laserWarningTimer > 0) {
+                        enemy.laserWarningTimer--;
+                        if (enemy.laserWarningTimer === 0) {
+                            // FIRE!
+                            enemy.potentialLasers.forEach(p => {
+                                let speed = 10; // Slightly faster for surprise
+                                enemyProjectiles.push({
+                                    x: p.x,
+                                    y: p.y,
+                                    width: 2000, height: 24,
+                                    vx: Math.cos(p.angle) * speed,
+                                    vy: Math.sin(p.angle) * speed,
+                                    color: 'magenta',
+                                    isLaser: true,
+                                    angle: p.angle
+                                });
+                            });
+                            enemy.potentialLasers = [];
+                            enemy.laserTimer = 600; // Reset timer after firing
                         }
                     }
                 }
+
             } else {
                 enemy.x += enemy.speed * enemy.dir;
                 // Simple Patrol Logic
@@ -1126,8 +1113,8 @@ function update() {
             if (enemy.isSuper) {
                 if (!enemy.isAwakened) {
                     enemy.isAwakened = true;
-                    enemy.hp = 300;
-                    enemy.maxHp = 300;
+                    enemy.hp = 150;
+                    enemy.maxHp = 150;
                     enemy.color = 'purple';
                     // enemy.awakeningWave = 0; // Removed Wave
                     enemy.speed = 3;
@@ -1210,14 +1197,10 @@ function draw() {
     // Clear screen (Sky remains static!)
     ctx.fillStyle = '#87CEEB';
 
-    // RED SKY effect during Fire Attack
-    // RED SKY removed
-    // let boss = enemies.find(e => e.type === 'boss');
-    // if (boss && boss.isSuper && boss.fireActiveTimer > 0) {
-    //    ctx.fillStyle = '#500000'; // Dark Red Sky
-    // }
-
+    // SKY COLOR (Static for now)
     ctx.fillRect(0, 0, canvas.width, canvas.height); // Draw sky fixed to screen
+
+    let boss = enemies.find(e => e.type === 'boss');
 
     // TIME STOP EFFECT (Purple tint)
     if (player.isTimeStopped) {
@@ -1326,68 +1309,22 @@ function draw() {
         return;
     }
 
-    // SUPER BOSS FIRE COUNTDOWN
+    // SUPER BOSS LASER COUNTDOWN
     if (boss && boss.isSuper) {
-        let timeLeft = Math.ceil(boss.fireTimer / 60);
+        let timeLeft = Math.ceil(boss.laserTimer / 60);
+        ctx.fillStyle = timeLeft <= 3 ? 'red' : 'white';
+        ctx.font = 'bold 30px Arial';
 
-        // SUPER BOSS FIRE COUNTDOWN REMOVED
-        if (boss.beams) {
-            boss.beams.forEach(beam => {
-                // Warning Line (Red Laser Sight)
-                if (beam.state === 'warning') {
-                    /* We must DRAW in SCREEN coords if we want to ignore camera transform? 
-                       NO, we are inside save/restore with translate(-camera.x).
-                       So we can draw in WORLD coords.
-                       Our beam.x/y are WORLD coords.
-                    */
-                    ctx.save();
-                    ctx.translate(-camera.x, 0); // Apply Camera (This block is OUTSIDE the main camera block??)
-                    // WAIT! Checking indentation... 
-                    // Line 1279: ctx.save(); ctx.translate(-camera.x, 0); starts AFTER this block!
-                    // This block (1240-1250) is BEFORE the main camera transform.
-                    // So ctx is currently SCREEN COORDS.
-
-                    // If I draw here, I must subtract camera.x from beam.x myself.
-
-                    let screenX = beam.x - camera.x;
-                    let screenY = beam.y;
-
-                    ctx.beginPath();
-                    ctx.moveTo(screenX, screenY);
-                    ctx.lineTo(screenX + Math.cos(beam.angle) * 2000, screenY + Math.sin(beam.angle) * 2000);
-
-                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([10, 10]); // Dashed Line
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                    ctx.restore();
-                }
-                // Firing Beam (Poison)
-                else if (beam.state === 'firing') {
-                    // Same logic, Manual Camera offset
-                    let screenX = beam.x - camera.x;
-                    let screenY = beam.y;
-
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.moveTo(screenX, screenY);
-                    ctx.lineTo(screenX + Math.cos(beam.angle) * 2000, screenY + Math.sin(beam.angle) * 2000);
-
-                    ctx.strokeStyle = '#8A2BE2'; // BlueViolet
-                    ctx.lineWidth = beam.width;
-                    ctx.shadowBlur = 20;
-                    ctx.shadowColor = 'purple';
-                    ctx.stroke();
-
-                    // Inner Core
-                    ctx.strokeStyle = 'white';
-                    ctx.lineWidth = beam.width / 3;
-                    ctx.stroke();
-
-                    ctx.restore();
-                }
-            });
+        if (boss.laserWarningTimer > 0) {
+            ctx.fillStyle = 'red';
+            ctx.font = 'bold 50px Arial';
+            ctx.fillText('レーザーがくるぞ！！', 250, 150);
+        } else {
+            ctx.fillText('レーザー攻撃まで: ' + timeLeft, 350, 100);
+            if (timeLeft <= 3) {
+                ctx.font = 'bold 50px Arial';
+                ctx.fillText('キケン！', 350, 150);
+            }
         }
     }
 
@@ -1421,16 +1358,51 @@ function draw() {
         ctx.fillRect(laser.x, laser.y, laser.width, laser.height);
     });
 
-    // Draw Enemy Projectiles (Fireballs / Poison)
+    // Draw Enemy Projectiles (Fireballs / Poison / Boss Lasers)
     enemyProjectiles.forEach(p => {
-        ctx.fillStyle = p.color ? p.color : 'orange'; // Respects 'purple' for poison
-        ctx.beginPath();
-        ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = p.isPoison ? 'black' : 'red';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        if (p.isLaser) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.angle);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(0, -p.height / 2, p.width, p.height);
+            // Glow effect
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'white';
+            ctx.fillRect(0, -p.height / 2, p.width, p.height);
+            ctx.restore();
+        } else {
+            ctx.fillStyle = p.color ? p.color : 'orange'; // Respects 'purple' for poison
+            ctx.beginPath();
+            ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = p.isPoison ? 'black' : 'red';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
     });
+
+    // Draw Laser Warnings
+    let bossInDraw = enemies.find(e => e.type === 'boss');
+    if (bossInDraw && bossInDraw.laserWarningTimer > 0 && bossInDraw.potentialLasers) {
+        ctx.save();
+        ctx.strokeStyle = '#FF3300'; // Bright Orange/Red
+        ctx.lineWidth = 4;
+        ctx.setLineDash([]); // Solid lines for better visibility
+        ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 100) * 0.3; // Slower pulsing
+
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = 'red';
+
+        bossInDraw.potentialLasers.forEach(p => {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            let lineLen = 2500;
+            ctx.lineTo(p.x + Math.cos(p.angle) * lineLen, p.y + Math.sin(p.angle) * lineLen);
+            ctx.stroke();
+        });
+        ctx.restore();
+    }
 
     // Draw Player
     let shouldDraw = true;

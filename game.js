@@ -827,6 +827,49 @@ function update() {
                 hit = true;
             }
 
+            if (distSq < hitR * hitR) {
+                hit = true;
+            }
+
+        } else if (p.isTrap) {
+            // POISON TRAP LOGIC
+            // Phase 1: Moving (handled by normal xy update above, but we need to stop it)
+            if (!p.isStopped) {
+                // Check if close to target
+                let dx = p.x - p.targetX;
+                let dy = p.y - p.targetY;
+                if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                    p.isStopped = true;
+                    p.vx = 0;
+                    p.vy = 0;
+                }
+            } else if (!p.isExploding) {
+                // Phase 2: Waiting
+                p.timer--;
+                if (p.timer <= 0) {
+                    p.isExploding = true;
+                    p.explodeTimer = 10; // 10 frames of damage
+                    p.width = 400; // 20m radius * 2 = 400px diameter
+                    p.height = 400;
+                    p.x -= 175; // Adjust center (approx)
+                    p.y -= 175;
+                }
+            } else {
+                // Phase 3: Exploding
+                p.explodeTimer--;
+                if (p.explodeTimer <= 0) {
+                    enemyProjectiles.splice(i, 1);
+                    continue;
+                }
+                // Check Collision (Circle)
+                let cx = p.x + p.width / 2;
+                let cy = p.y + p.height / 2;
+                let px = player.x + player.width / 2;
+                let py = player.y + player.height / 2;
+                let dist = Math.sqrt((cx - px) ** 2 + (cy - py) ** 2);
+                if (dist < 200) hit = true;
+            }
+
         } else {
             // STANDARD AABB
             if (player.x < p.x + p.width &&
@@ -1172,6 +1215,24 @@ function update() {
                             enemy.potentialLasers = [];
                             enemy.laserTimer = 600; // Reset timer after firing
                         }
+                    }
+
+                    // --- NEW: POISON TRAP (Hydra Only) ---
+                    if (enemy.isSuper && Math.random() < 0.005) { // Rare chance per frame
+                        enemyProjectiles.push({
+                            x: enemy.x + enemy.width / 2,
+                            y: enemy.y + enemy.height / 2,
+                            vx: (player.x - enemy.x) / 60, // Aim to land in 1 sec (approx)
+                            vy: (player.y - enemy.y) / 60,
+                            targetX: player.x,
+                            targetY: player.y,
+                            width: 50, height: 50,
+                            color: 'purple',
+                            isTrap: true,
+                            isStopped: false,
+                            timer: 180, // 3 seconds
+                            isExploding: false
+                        });
                     }
                 }
 
@@ -1587,6 +1648,28 @@ function draw() {
             ctx.fill();
 
             ctx.restore();
+
+        } else if (p.isTrap) {
+            // POISON TRAP DRAWING
+            if (p.isExploding) {
+                ctx.fillStyle = `rgba(148, 0, 211, 0.6)`; // Neo Purple Transparent
+                ctx.beginPath();
+                ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // Pulsing Ball
+                let pulse = Math.sin(Date.now() / 100) * 5;
+                ctx.fillStyle = 'purple';
+                ctx.beginPath();
+                ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2 + pulse, 0, Math.PI * 2);
+                ctx.fill();
+                // Warning Text
+                if (p.isStopped) {
+                    ctx.fillStyle = 'white';
+                    ctx.font = '12px Arial';
+                    ctx.fillText((p.timer / 60).toFixed(1), p.x + 10, p.y);
+                }
+            }
 
         } else {
             ctx.fillStyle = p.color ? p.color : 'orange'; // Respects 'purple' for poison

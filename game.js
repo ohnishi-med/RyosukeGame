@@ -1226,6 +1226,9 @@ function update() {
 
                     try {
                         localStorage.setItem('ryosuke_super_win', 'true');
+                        // Increment Kill Count
+                        let kills = parseInt(localStorage.getItem('ryosuke_hydra_kills') || '0');
+                        localStorage.setItem('ryosuke_hydra_kills', kills + 1);
                     } catch (e) { console.log('Storage failed', e); }
 
                     // Spawn Clones
@@ -1316,6 +1319,12 @@ function draw() {
             ctx.font = 'bold 20px Arial';
             ctx.fillText('真の勇者', 70, 460); // Text next to crown
             ctx.filter = 'none';
+
+            // Show Kill Count
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            let kills = localStorage.getItem('ryosuke_hydra_kills') || '0';
+            ctx.fillText(`撃破数: ${kills}`, 200, 460);
         }
 
         // LENGTH SELECTION UI

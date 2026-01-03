@@ -315,8 +315,8 @@ function startNewGame(idx) {
         speed: isSuper ? 3 : 2, // Faster if Super
         dir: -1,
         type: 'boss',
-        hp: isSuper ? 60 : 30, // 60 HP for Hydra
-        maxHp: isSuper ? 60 : 30,
+        hp: isSuper ? 80 : 30, // 80 HP for Hydra
+        maxHp: isSuper ? 80 : 30,
         nextShot: 100,
         isSuper: isSuper,
         isAwakened: startAwakened, // Start as Hydra immediately
@@ -1256,8 +1256,8 @@ function update() {
             if (enemy.isSuper) {
                 if (!enemy.isAwakened) {
                     enemy.isAwakened = true;
-                    enemy.hp = 60; // Set to 60
-                    enemy.maxHp = 60;
+                    enemy.hp = 80; // Set to 80
+                    enemy.maxHp = 80;
                     enemy.color = 'purple';
                     // enemy.awakeningWave = 0; // Removed Wave
                     enemy.speed = 3;

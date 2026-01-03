@@ -362,39 +362,12 @@ document.addEventListener('keydown', function (e) {
         return;
     }
 
-    // Shooting Logic (Z Key)
+    // Shooting Logic (KeyZ) - DISABLED (Moved to Mouse Click)
+    /*
     if (e.code === 'KeyZ') {
-        if (player.shotCooldown > 0) return; // Cooldown check
-
-        player.shotCooldown = 20; // Set cooldown (0.3s)
-
-        let dir = player.facingRight ? 1 : -1;
-        let speed = 10;
-
-        let shots = [];
-        if (player.canTripleShot) {
-            // Triple Shot: Straight, Up-Diagonal, Down-Diagonal
-            shots.push({ vx: speed * dir, vy: 0 });
-            shots.push({ vx: speed * dir, vy: -2 }); // Diagonal Up
-            shots.push({ vx: speed * dir, vy: 2 });  // Diagonal Down
-        } else {
-            // Normal Shot
-            shots.push({ vx: speed * dir, vy: 0 });
-        }
-
-        shots.forEach(shot => {
-            lasers.push({
-                x: player.x + player.width / 2,
-                y: player.y + player.height / 2,
-                width: 30,
-                height: 5,
-                vx: shot.vx,
-                vy: shot.vy,
-                color: player.canStrongBeam ? 'orange' : 'yellow',
-                isStrong: player.canStrongBeam
-            });
-        });
+         // ... (Disabled)
     }
+    */
 
     keys[e.code] = true;
 
@@ -2115,9 +2088,11 @@ canvas.addEventListener('mousedown', function (e) {
     const mouseX = (e.clientX - rect.left) * scaleX;
     const mouseY = (e.clientY - rect.top) * scaleY;
 
+    let uiClicked = false;
     touchControls.forEach(btn => {
         if (mouseX > btn.x && mouseX < btn.x + btn.width &&
             mouseY > btn.y && mouseY < btn.y + btn.height) {
+            uiClicked = true;
             keys[btn.key] = true;
 
             // Handle Jump Logic explicitly for mouse click too
@@ -2133,35 +2108,50 @@ canvas.addEventListener('mousedown', function (e) {
                     player.jumpCount++;
                 }
             }
-            // Handle Attack Logic
-            if (btn.id === 'attack') {
-                if (player.shotCooldown <= 0) {
-                    player.shotCooldown = 20;
-                    // Simulate Attack
-                    let dir = player.facingRight ? 1 : -1;
-                    let speed = 10;
-                    let shots = [];
-                    if (player.canTripleShot) {
-                        shots.push({ vx: speed * dir, vy: 0 });
-                        shots.push({ vx: speed * dir, vy: -2 });
-                        shots.push({ vx: speed * dir, vy: 2 });
-                    } else {
-                        shots.push({ vx: speed * dir, vy: 0 });
-                    }
-                    shots.forEach(shot => {
-                        lasers.push({
-                            x: player.x + player.width / 2, y: player.y + player.height / 2, width: 30, height: 5,
-                            vx: shot.vx, vy: shot.vy, color: player.canStrongBeam ? 'orange' : 'yellow', isStrong: player.canStrongBeam
-                        });
-                    });
-                }
-            }
             // Handle Ultimate Logic
             if (btn.id === 'ult') {
                 if (player.ultimateCooldown <= 0) activateUltimate();
             }
         }
     });
+
+    // Check Right Side UI (approximate check for specific buttons)
+    if (mouseX > 600 && mouseY < 500) uiClicked = true;
+
+    // CLICK TO SHOOT (if not UI)
+    if (!uiClicked && player.shotCooldown <= 0) {
+        player.shotCooldown = 20;
+
+        // Calculate Angle
+        let worldMouseX = mouseX + camera.x;
+        let pCenterX = player.x + player.width / 2;
+        let pCenterY = player.y + player.height / 2;
+        let angle = Math.atan2(mouseY - pCenterY, worldMouseX - pCenterX);
+
+        let speed = 10;
+        let shots = [];
+
+        // Triple Shot Aiming
+        if (player.canTripleShot) {
+            shots.push({ angle: angle });
+            shots.push({ angle: angle - 0.2 });
+            shots.push({ angle: angle + 0.2 });
+        } else {
+            shots.push({ angle: angle });
+        }
+
+        shots.forEach(shot => {
+            lasers.push({
+                x: pCenterX, y: pCenterY,
+                width: 30, height: 5,
+                vx: Math.cos(shot.angle) * speed,
+                vy: Math.sin(shot.angle) * speed, // Use vy for aiming
+                color: player.canStrongBeam ? 'orange' : 'yellow',
+                isStrong: player.canStrongBeam,
+                angle: shot.angle // Store angle for visual rotation if needed
+            });
+        });
+    }
 });
 
 canvas.addEventListener('mouseup', function (e) {

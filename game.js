@@ -314,8 +314,8 @@ function startNewGame(idx) {
         speed: isSuper ? 3 : 2, // Faster if Super
         dir: -1,
         type: 'boss',
-        hp: isSuper ? 150 : 30, // 300 HP for Hydra
-        maxHp: isSuper ? 150 : 30,
+        hp: isSuper ? 60 : 30, // 60 HP for Hydra
+        maxHp: isSuper ? 60 : 30,
         nextShot: 100,
         isSuper: isSuper,
         isAwakened: startAwakened, // Start as Hydra immediately

@@ -1138,8 +1138,8 @@ function update() {
             if (enemy.isSuper) {
                 if (!enemy.isAwakened) {
                     enemy.isAwakened = true;
-                    enemy.hp = 56; // Half of 112
-                    enemy.maxHp = 56;
+                    enemy.hp = 60; // Set to 60
+                    enemy.maxHp = 60;
                     enemy.color = 'purple';
                     // enemy.awakeningWave = 0; // Removed Wave
                     enemy.speed = 3;

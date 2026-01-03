@@ -1541,6 +1541,15 @@ function draw() {
             ctx.fillStyle = enemy.isAwakened ? 'purple' : 'green';
             let hpPercent = Math.max(0, enemy.hp / enemy.maxHp);
             ctx.fillRect(enemy.x, enemy.y - 20, enemy.width * hpPercent, 10);
+
+            // Draw HP Text
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 16px Arial';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            let hpText = enemy.hp + " / " + enemy.maxHp;
+            ctx.strokeText(hpText, enemy.x, enemy.y - 25);
+            ctx.fillText(hpText, enemy.x, enemy.y - 25);
             return;
         }
 

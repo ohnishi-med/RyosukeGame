@@ -273,10 +273,10 @@ function startNewGame(idx) {
             { x: 0, y: 500, width: 2500, height: 50 } // Long flat floor
         ];
 
-        // Safety Blocks (to escape fire)
-        platforms.push({ x: 400, y: 350, width: 100, height: 20 });
-        platforms.push({ x: 800, y: 350, width: 100, height: 20 });
-        platforms.push({ x: 1200, y: 350, width: 100, height: 20 });
+        // Safety Blocks REMOVED
+        // platforms.push({ x: 400, y: 350, width: 100, height: 20 });
+        // platforms.push({ x: 800, y: 350, width: 100, height: 20 });
+        // platforms.push({ x: 1200, y: 350, width: 100, height: 20 });
 
         // No random enemies
         enemies = [];
@@ -955,21 +955,103 @@ function update() {
                     if (enemy.x < player.x - 200) enemy.x += 1;
                     if (enemy.x > player.x + 200) enemy.x -= 1;
 
-                    // 2. Fire Attack Logic
-                    if (enemy.fireActiveTimer > 0) {
-                        // Fire is ACTIVE!
-                        enemy.fireActiveTimer--;
+                    // 2. Poison Beam Logic (Hydra Only)
+                    if (enemy.isAwakened) {
+                        if (enemy.beamTimer > 0) {
+                            enemy.beamTimer--;
+                        } else {
+                            // Add New Beam Warning
+                            // Random Start Point (Relative to Camera -> World Coords)
+                            let startX, startY;
+                            // Pick a side: Top, Bottom, Left, Right
+                            let side = Math.floor(Math.random() * 4);
 
-                        // Damage Player if on ground (y > 450 approx)
-                        if (player.y >= 449 && player.grounded) {
-                            takeDamage(false, 1); // Burn!!
+                            switch (side) {
+                                case 0: // Left
+                                    startX = camera.x;
+                                    startY = Math.random() * canvas.height;
+                                    break;
+                                case 1: // Right
+                                    startX = camera.x + canvas.width;
+                                    startY = Math.random() * canvas.height;
+                                    break;
+                                case 2: // Top
+                                    startX = camera.x + Math.random() * canvas.width;
+                                    startY = 0;
+                                    break;
+                                case 3: // Bottom
+                                    startX = camera.x + Math.random() * canvas.width;
+                                    startY = canvas.height;
+                                    break;
+                            }
+
+                            // Target Player (World Coords)
+                            let angle = Math.atan2(
+                                (player.y + player.height / 2) - startY,
+                                (player.x + player.width / 2) - startX
+                            );
+
+                            // Randomize angle start slightly
+                            angle += (Math.random() - 0.5) * 0.2;
+
+                            enemy.beams.push({
+                                x: startX,
+                                y: startY,
+                                angle: angle,
+                                state: 'warning', // warning -> firing
+                                timer: 90, // 1.5s Warning
+                                width: 40 // Beam width
+                            });
+                            // Cooldown
+                            enemy.beamTimer = 100; // 1.6 seconds
                         }
-                    } else {
-                        // Countdown
-                        enemy.fireTimer--;
-                        if (enemy.fireTimer <= 0) {
-                            enemy.fireActiveTimer = 180; // Activate for 3 seconds
-                            enemy.fireTimer = 600; // Reset timer
+
+                        // Process Beams
+                        for (let b = enemy.beams.length - 1; b >= 0; b--) {
+                            let beam = enemy.beams[b];
+                            beam.timer--;
+
+                            if (beam.state === 'warning') {
+                                if (beam.timer <= 0) {
+                                    beam.state = 'firing';
+                                    beam.timer = 60; // Fire for 1 second
+                                }
+                            } else if (beam.state === 'firing') {
+                                // Collision Check Line-Rect
+                                // Simplified: Check if player center is close to line
+                                // P = Beam Start, V = Vector(cos, sin)
+                                // Q = Player Center
+                                // Dist = |(Q-P) x V| / |V| (2D cross product)
+
+                                let px = player.x + player.width / 2;
+                                let py = player.y + player.height / 2;
+
+                                let dx = Math.cos(beam.angle);
+                                let dy = Math.sin(beam.angle);
+
+                                // Vector from Beam Start to Player
+                                let v1x = px - beam.x;
+                                let v1y = py - beam.y;
+
+                                // Cross Product (2D) to find distance from line
+                                let dist = Math.abs(v1x * dy - v1y * dx);
+
+                                // Also project to ensure we are "in front" of beam start (dot product > 0)
+                                let dot = v1x * dx + v1y * dy;
+
+                                if (dist < beam.width / 2 + player.width / 2 && dot > 0) {
+                                    // Hit!
+                                    if (player.isSuperInvincible) {
+                                        // Invincible
+                                    } else {
+                                        takeDamage(false, 1);
+                                    }
+                                }
+
+                                if (beam.timer <= 0) {
+                                    enemy.beams.splice(b, 1);
+                                }
+                            }
                         }
                     }
                 }
@@ -1043,13 +1125,14 @@ function update() {
         if (enemy.hp <= 0 && enemy.type === 'boss') {
             if (enemy.isSuper) {
                 if (!enemy.isAwakened) {
-                    // --- AWAKENING EVENT ---
                     enemy.isAwakened = true;
                     enemy.hp = 300;
                     enemy.maxHp = 300;
                     enemy.color = 'purple';
-                    enemy.awakeningWave = 0;
+                    // enemy.awakeningWave = 0; // Removed Wave
                     enemy.speed = 3;
+                    enemy.beams = []; // Initialize Beam Array
+                    enemy.beamTimer = 60; // Initial delay
 
                     // Player Buff
                     player.maxHp = 20;
@@ -1128,10 +1211,11 @@ function draw() {
     ctx.fillStyle = '#87CEEB';
 
     // RED SKY effect during Fire Attack
-    let boss = enemies.find(e => e.type === 'boss');
-    if (boss && boss.isSuper && boss.fireActiveTimer > 0) {
-        ctx.fillStyle = '#500000'; // Dark Red Sky
-    }
+    // RED SKY removed
+    // let boss = enemies.find(e => e.type === 'boss');
+    // if (boss && boss.isSuper && boss.fireActiveTimer > 0) {
+    //    ctx.fillStyle = '#500000'; // Dark Red Sky
+    // }
 
     ctx.fillRect(0, 0, canvas.width, canvas.height); // Draw sky fixed to screen
 
@@ -1246,31 +1330,64 @@ function draw() {
     if (boss && boss.isSuper) {
         let timeLeft = Math.ceil(boss.fireTimer / 60);
 
-        if (boss.fireActiveTimer > 0) {
-            // FIRE ACTIVE!
-            ctx.fillStyle = 'red';
-            ctx.font = 'bold 40px Arial';
-            ctx.fillText('地面が燃えている！！', 300, 150);
+        // SUPER BOSS FIRE COUNTDOWN REMOVED
+        if (boss.beams) {
+            boss.beams.forEach(beam => {
+                // Warning Line (Red Laser Sight)
+                if (beam.state === 'warning') {
+                    /* We must DRAW in SCREEN coords if we want to ignore camera transform? 
+                       NO, we are inside save/restore with translate(-camera.x).
+                       So we can draw in WORLD coords.
+                       Our beam.x/y are WORLD coords.
+                    */
+                    ctx.save();
+                    ctx.translate(-camera.x, 0); // Apply Camera (This block is OUTSIDE the main camera block??)
+                    // WAIT! Checking indentation... 
+                    // Line 1279: ctx.save(); ctx.translate(-camera.x, 0); starts AFTER this block!
+                    // This block (1240-1250) is BEFORE the main camera transform.
+                    // So ctx is currently SCREEN COORDS.
 
-            // Draw LAVA Overlay on floor
-            ctx.fillStyle = 'rgba(255, 69, 0, 0.7)';
-            ctx.fillRect(0, 500, canvas.width, 50); // Visual lava on floor
-        } else {
-            // COUNTDOWN
-            ctx.fillStyle = timeLeft <= 3 ? 'red' : 'white';
-            ctx.font = 'bold 30px Arial';
-            ctx.fillText('炎上まで: ' + timeLeft, 350, 100);
+                    // If I draw here, I must subtract camera.x from beam.x myself.
 
-            if (timeLeft <= 3) {
-                ctx.font = 'bold 50px Arial';
-                ctx.fillText('逃げろ！', 350, 150);
+                    let screenX = beam.x - camera.x;
+                    let screenY = beam.y;
 
-                // Warning Flash on floor
-                if (boss.fireTimer % 10 < 5) {
-                    ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
-                    ctx.fillRect(0, 500, canvas.width, 50);
+                    ctx.beginPath();
+                    ctx.moveTo(screenX, screenY);
+                    ctx.lineTo(screenX + Math.cos(beam.angle) * 2000, screenY + Math.sin(beam.angle) * 2000);
+
+                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([10, 10]); // Dashed Line
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.restore();
                 }
-            }
+                // Firing Beam (Poison)
+                else if (beam.state === 'firing') {
+                    // Same logic, Manual Camera offset
+                    let screenX = beam.x - camera.x;
+                    let screenY = beam.y;
+
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(screenX, screenY);
+                    ctx.lineTo(screenX + Math.cos(beam.angle) * 2000, screenY + Math.sin(beam.angle) * 2000);
+
+                    ctx.strokeStyle = '#8A2BE2'; // BlueViolet
+                    ctx.lineWidth = beam.width;
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = 'purple';
+                    ctx.stroke();
+
+                    // Inner Core
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = beam.width / 3;
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+            });
         }
     }
 
@@ -1278,8 +1395,8 @@ function draw() {
     ctx.save();
     ctx.translate(-camera.x, 0); // Move everything left by camera.x
 
-    // Draw Floor (LAVA)
-    ctx.fillStyle = '#FF4500'; // OrangeRed
+    // Draw Floor (LAVA Removed - Normal Floor)
+    ctx.fillStyle = '#654321'; // Dark Brown
     ctx.fillRect(0, 550, levelWidth, 50);
 
     // Draw Platforms

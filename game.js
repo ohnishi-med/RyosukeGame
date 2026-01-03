@@ -300,6 +300,7 @@ function startNewGame(idx) {
     levelWidth = selectedLevelLength;
     goal.x = levelWidth - 200;
     goal.active = false; // Hidden until boss defeated
+    goal.missileTimer = 2400; // 40 seconds initial logic
 
     // Add Boss Enemy
     let isSuper = bossMode;
@@ -664,6 +665,38 @@ function update() {
     }
 
     if (gameState !== 'PLAYING') return;
+
+    // --- CHEST MISSILE LOGIC (Normal Mode Only) ---
+    if (!bossMode && !goal.active) { // Only if boss is not defeated yet? Or always? Assuming always until victory.
+        // Actually, goal.active becomes true when boss dies.
+        // Request: "In normal stage (通常のステージで)".
+        // So we run this logic while playing normal mode.
+
+        goal.missileTimer--;
+
+        // Fire at 0
+        if (goal.missileTimer <= 0) {
+            goal.missileTimer = 2400; // Reset to 40s
+
+            // Calculate Angle to Player
+            let gx = goal.x + goal.width / 2;
+            let gy = goal.y + goal.height / 2;
+            let px = player.x + player.width / 2;
+            let py = player.y + player.height / 2;
+            let angle = Math.atan2(py - gy, px - gx);
+
+            // Fire Missile
+            enemyProjectiles.push({
+                x: gx, y: gy,
+                width: 30, height: 15,
+                vx: Math.cos(angle) * 8, // Fast
+                vy: Math.sin(angle) * 8,
+                color: 'red',
+                isMissile: true // Tag for drawing/logic
+            });
+        }
+    }
+
     // Check Goal Collision
     // ... (Existing Goal Logic)
 
@@ -1460,6 +1493,36 @@ function draw() {
         } else {
             ctx.fillStyle = 'gold';
             ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
+        }
+    }
+
+    // Draw Chest Missile Warning (Normal Mode)
+    if (!bossMode && gameState === 'PLAYING') {
+        if (goal.missileTimer < 180) { // Last 3 seconds
+            // Flashing Warning Line
+            if (Math.floor(Date.now() / 100) % 2 === 0) {
+                ctx.save();
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([10, 10]);
+
+                let gx = goal.x + goal.width / 2;
+                let gy = goal.y + goal.height / 2;
+                let px = player.x + player.width / 2;
+                let py = player.y + player.height / 2;
+
+                ctx.beginPath();
+                ctx.moveTo(gx, gy);
+                ctx.lineTo(px, py);
+                ctx.stroke();
+
+                // Draw Warning Text near goal
+                ctx.fillStyle = 'red';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText('⚠ DANGER', gx - 40, gy - 20);
+
+                ctx.restore();
+            }
         }
     }
 

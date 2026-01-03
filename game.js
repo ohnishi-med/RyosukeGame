@@ -1321,10 +1321,13 @@ function draw() {
             ctx.filter = 'none';
 
             // Show Kill Count
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
+            ctx.fillStyle = '#bc13fe'; // Neo Purple
+            ctx.font = 'bold 24px Arial'; // Slightly bigger/bold for effect
+            ctx.shadowColor = '#bc13fe';
+            ctx.shadowBlur = 10; // Add glow for "Neo" effect
             let kills = localStorage.getItem('ryosuke_hydra_kills') || '0';
             ctx.fillText(`撃破数: ${kills}`, 200, 460);
+            ctx.shadowBlur = 0; // Reset glow
         }
 
         // LENGTH SELECTION UI

@@ -273,18 +273,8 @@ function startNewGame(idx) {
             { x: 0, y: 500, width: 2500, height: 50 } // Long flat floor
         ];
 
-        // Safety Blocks & Random Platforms
-        for (let i = 0; i < 15; i++) {
-            platforms.push({
-                x: 100 + Math.random() * 1500, // Random X
-                y: 150 + Math.random() * 300,  // Random Y (Height)
-                width: 60,
-                height: 20
-            });
-        }
-        platforms.push({ x: 400, y: 350, width: 100, height: 20 });
-        platforms.push({ x: 800, y: 350, width: 100, height: 20 });
-        platforms.push({ x: 1200, y: 350, width: 100, height: 20 });
+        // Safety Blocks & Random Platforms - REMOVED per request
+        // platforms = []; // Clean slate (already initialized with floor above)
 
         // No random enemies
         enemies = [];

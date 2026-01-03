@@ -689,8 +689,8 @@ function update() {
             enemyProjectiles.push({
                 x: gx, y: gy,
                 width: 30, height: 15,
-                vx: Math.cos(angle) * 8, // Fast
-                vy: Math.sin(angle) * 8,
+                vx: Math.cos(angle) * 15, // Ultra Fast (Was 8)
+                vy: Math.sin(angle) * 15,
                 color: 'red',
                 isMissile: true // Tag for drawing/logic
             });
@@ -844,6 +844,24 @@ function update() {
                 player.y < p.y + p.height &&
                 player.y + player.height > p.y) {
                 hit = true;
+            }
+        }
+
+        // --- SAFE ZONE LOGIC ---
+        // If it's a missile and Player is near Boss (within 2m / 200px), ignore hit
+        if (hit && p.isMissile) {
+            let boss = enemies.find(e => e.type === 'boss');
+            if (boss) {
+                let bx = boss.x + boss.width / 2;
+                let by = boss.y + boss.height / 2;
+                let px = player.x + player.width / 2;
+                let py = player.y + player.height / 2;
+                let dist = Math.sqrt((px - bx) ** 2 + (py - by) ** 2);
+
+                if (dist < 200) { // 2m Check
+                    hit = false;
+                    // Optional: Visual feedback "SAFE" popup?
+                }
             }
         }
 

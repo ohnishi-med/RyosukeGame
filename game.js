@@ -682,7 +682,13 @@ function update() {
 
         // Cleanup (Allow lasers to be big/offscreen as long as origin is reasonable? Or just large bounds)
         // For beams, width is 2000, so we check origin.
-        if (p.x < -2000 || p.x > levelWidth + 2000 || p.y < -2000 || p.y > canvas.height + 2000) {
+        if (p.life !== undefined) {
+            p.life--;
+            if (p.life <= 0) {
+                enemyProjectiles.splice(i, 1);
+                continue;
+            }
+        } else if (p.x < -2000 || p.x > levelWidth + 2000 || p.y < -2000 || p.y > canvas.height + 2000) {
             enemyProjectiles.splice(i, 1);
             continue;
         }
@@ -1024,16 +1030,21 @@ function update() {
                         if (enemy.laserWarningTimer === 0) {
                             // FIRE!
                             enemy.potentialLasers.forEach(p => {
-                                let speed = 10; // Slightly faster for surprise
+                                // BACKWARD OFFSET to hide start corner
+                                // Move starting point 5000px backwards along the line
+                                let backX = p.x - Math.cos(p.angle) * 5000;
+                                let backY = p.y - Math.sin(p.angle) * 5000;
+
                                 enemyProjectiles.push({
-                                    x: p.x,
-                                    y: p.y,
-                                    width: 2000, height: 24,
-                                    vx: Math.cos(p.angle) * speed,
-                                    vy: Math.sin(p.angle) * speed,
+                                    x: backX,
+                                    y: backY,
+                                    width: 10000, height: 24, // Super long
+                                    vx: 0, // Stop!
+                                    vy: 0,
                                     color: 'magenta',
                                     isLaser: true,
-                                    angle: p.angle
+                                    angle: p.angle,
+                                    life: 120 // 2 seconds
                                 });
                             });
                             enemy.potentialLasers = [];

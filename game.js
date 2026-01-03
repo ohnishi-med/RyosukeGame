@@ -1200,7 +1200,7 @@ function draw() {
     // SKY COLOR (Static for now)
     ctx.fillRect(0, 0, canvas.width, canvas.height); // Draw sky fixed to screen
 
-    let boss = enemies.find(e => e.type === 'boss');
+    var boss = enemies.find(e => e.type === 'boss');
 
     // TIME STOP EFFECT (Purple tint)
     if (player.isTimeStopped) {
